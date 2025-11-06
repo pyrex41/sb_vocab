@@ -1,0 +1,80 @@
+extends Control
+
+@onready var activity_container = $ActivityContainer
+@onready var progress_label = $TopBar/ProgressLabel
+@onready var feedback_panel = $FeedbackPanel
+@onready var feedback_label = $FeedbackPanel/MarginContainer/VBoxContainer/FeedbackLabel
+@onready var next_button = $FeedbackPanel/MarginContainer/VBoxContainer/NextButton
+
+# Activity scene references
+var flashcard_scene = preload("res://scenes/activities/Flashcard.tscn")
+var multiple_choice_scene = preload("res://scenes/activities/MultipleChoice.tscn")
+var spelling_scene = preload("res://scenes/activities/Spelling.tscn")
+var fill_blank_scene = preload("res://scenes/activities/FillBlank.tscn")
+var synonym_antonym_scene = preload("res://scenes/activities/SynonymAntonym.tscn")
+
+var current_activity_node = null
+
+func _ready():
+	feedback_panel.hide()
+	next_button.pressed.connect(_on_next_button_pressed)
+	
+	SessionManager.activity_changed.connect(_on_activity_changed)
+	SessionManager.attempt_result.connect(_on_attempt_result)
+	SessionManager.session_ended.connect(_on_session_ended)
+	
+	# Start the session
+	SessionManager.start_new_session("grade3")
+
+func _on_activity_changed(activity_data: Dictionary, index: int, total: int):
+	progress_label.text = "Activity %d / %d" % [index, total]
+	_load_activity(activity_data)
+
+func _load_activity(activity_data: Dictionary):
+	# Clear previous activity
+	if current_activity_node:
+		current_activity_node.queue_free()
+		current_activity_node = null
+	
+	# Load appropriate activity scene
+	var scene = null
+	match activity_data.type:
+		"flashcard":
+			scene = flashcard_scene
+		"multiple_choice":
+			scene = multiple_choice_scene
+		"spelling":
+			scene = spelling_scene
+		"fill_blank":
+			scene = fill_blank_scene
+		"synonym_antonym":
+			scene = synonym_antonym_scene
+	
+	if scene:
+		current_activity_node = scene.instantiate()
+		activity_container.add_child(current_activity_node)
+		current_activity_node.setup(activity_data)
+		
+		# Connect answer submission
+		if current_activity_node.has_signal("answer_submitted"):
+			current_activity_node.answer_submitted.connect(_on_answer_submitted)
+
+func _on_answer_submitted(answer: String):
+	SessionManager.submit_answer(answer)
+
+func _on_attempt_result(correct: bool, feedback: String):
+	feedback_label.text = feedback
+	
+	if correct:
+		feedback_panel.modulate = Color(0.2, 0.8, 0.3)  # Green
+	else:
+		feedback_panel.modulate = Color(0.9, 0.3, 0.2)  # Red
+	
+	feedback_panel.show()
+
+func _on_next_button_pressed():
+	feedback_panel.hide()
+
+func _on_session_ended(summary: Dictionary):
+	# Navigate to results screen
+	get_tree().change_scene_to_file("res://scenes/ResultsScreen.tscn")

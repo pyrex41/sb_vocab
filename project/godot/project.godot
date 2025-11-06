@@ -1,0 +1,17 @@
+[gd_scene load_steps=1 format=3 uid="uid://game_root"]
+
+[application]
+config/name="Playcademy Vocab"
+config/version="0.1.0"
+run/main_scene="res://scenes/main_menu.tscn"
+
+[autoload]
+PlaycademySDK="*res://addons/playcademy_sdk/PlaycademySDK.gd"
+
+[debug]
+gdscript/warnings/unused_variable=1
+gdscript/warnings/unused_parameter=1
+gdscript/warnings/unreachable_code=1
+
+[rendering]
+textures/canvas_textures/hdri_mode=1

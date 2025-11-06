@@ -1,0 +1,70 @@
+{
+  "vocabulary": [
+    {
+      "id": "word_1",
+      "word": "Ephemeral",
+      "definition": "Lasting for a very short time",
+      "example": "The beauty of cherry blossoms is ephemeral, lasting only a few weeks.",
+      "grade": 4,
+      "audio": "ephemeral.mp3"
+    },
+    {
+      "id": "word_2",
+      "word": "Persevere",
+      "definition": "To continue despite difficulty",
+      "example": "If you persevere through the challenges, you will succeed.",
+      "grade": 4,
+      "audio": "persevere.mp3"
+    },
+    {
+      "id": "word_3",
+      "word": "Benevolent",
+      "definition": "Kind and generous",
+      "example": "The benevolent teacher helped students who struggled.",
+      "grade": 5,
+      "audio": "benevolent.mp3"
+    },
+    {
+      "id": "word_4",
+      "word": "Diligent",
+      "definition": "Showing care and effort in work",
+      "example": "Her diligent study habits earned her excellent grades.",
+      "grade": 4,
+      "audio": "diligent.mp3"
+    },
+    {
+      "id": "word_5",
+      "word": "Meticulous",
+      "definition": "Very careful and precise",
+      "example": "The artist was meticulous in every detail of the painting.",
+      "grade": 5,
+      "audio": "meticulous.mp3"
+    }
+  ],
+  "activities": [
+    {
+      "type": "flashcard",
+      "description": "Learn the word definition"
+    },
+    {
+      "type": "multiple_choice",
+      "description": "Choose the correct meaning"
+    },
+    {
+      "type": "spelling",
+      "description": "Type what you hear"
+    },
+    {
+      "type": "fill_blank",
+      "description": "Complete the sentence"
+    },
+    {
+      "type": "synonym",
+      "description": "Find the synonym or antonym"
+    },
+    {
+      "type": "sentence",
+      "description": "Create a sentence with the word"
+    }
+  ]
+}

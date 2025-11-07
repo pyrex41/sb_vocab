@@ -7,10 +7,12 @@ signal answer_submitted(answer)
 
 var word_data: Dictionary
 var options: Array
-var selected_answer: String = ""
+var option_buttons: Array[Button] = []
 
 func _ready():
-	pass
+	# Connect to loading signals to disable buttons during API calls
+	SessionManager.loading_started.connect(_on_loading_started)
+	SessionManager.loading_ended.connect(_on_loading_ended)
 
 func setup(activity_data: Dictionary):
 	# Validate required fields
@@ -37,13 +39,19 @@ func setup(activity_data: Dictionary):
 
 	question_label.text = "What does '%s' mean?" % word_data.word
 
+	# Clear previous buttons
+	option_buttons.clear()
+	for child in options_container.get_children():
+		child.queue_free()
+
 	# Create option buttons
 	for i in range(options.size()):
 		var button = Button.new()
 		button.text = options[i]
 		button.custom_minimum_size = Vector2(600, 60)
-		button.pressed.connect(_on_option_selected.bind(options[i]))
+		button.pressed.connect(_on_option_selected.bind(options[i], button))
 		options_container.add_child(button)
+		option_buttons.append(button)
 
 func _create_error_button():
 	"""Create skip button if data is invalid"""
@@ -56,6 +64,23 @@ func _create_error_button():
 func _on_skip_activity():
 	answer_submitted.emit("")
 
-func _on_option_selected(answer: String):
-	selected_answer = answer
+func _on_option_selected(answer: String, selected_button: Button):
+	# Disable all buttons to prevent double-submission
+	for button in option_buttons:
+		button.disabled = true
+
+	# Visual feedback: highlight the selected button
+	selected_button.modulate = Color(0.7, 1.0, 0.7)  # Light green tint
+
 	answer_submitted.emit(answer)
+
+func _on_loading_started():
+	# Disable all option buttons during API call
+	for button in option_buttons:
+		button.disabled = true
+
+func _on_loading_ended():
+	# Re-enable all option buttons after API call
+	for button in option_buttons:
+		button.disabled = false
+		button.modulate = Color.WHITE  # Reset color

@@ -18,6 +18,7 @@ var current_activity_index: int = 0
 var session_active: bool = false
 var last_failed_operation: Dictionary = {}  # Store failed operation for retry
 var course_id: String = ""  # Will store the first available course ID
+var last_session_summary: Dictionary = {}  # Store last session summary for results screen
 
 func start_new_session(grade: String = "grade3"):
 	# Store operation for retry in case of failure
@@ -91,14 +92,16 @@ func _load_next_activity():
 
 	var response = await PlaycademySdk.backend.request(
 		"POST",
-		"/session/" + current_session_id + "/next",
+		"/session/%s/next" % current_session_id,
 		{}
 	)
 
 	loading_ended.emit()
 
-	if response.has("error"):
-		_handle_api_error(response.error)
+	# Check for API errors with consistent type handling
+	if response.has("error") and response.error:
+		var error_data = response.error if typeof(response.error) == TYPE_DICTIONARY else {"message": str(response.error)}
+		_handle_api_error(error_data)
 		return
 
 	# Check if session is complete (no more items)
@@ -107,11 +110,17 @@ func _load_next_activity():
 		_end_session()
 		return
 
-	# Store the current item ID for submission
-	if response.has("itemId"):
-		current_item_id = response.itemId
+	# Validate that itemId is present - required for answer submission
+	if not response.has("itemId") or response.itemId == "":
+		push_error("Backend response missing itemId - cannot continue session")
+		api_error.emit("Invalid activity data from server. Ending session.")
+		_end_session()
+		return
 
-	# Record activity start time for latency calculation
+	# Store the current item ID for submission
+	current_item_id = response.itemId
+
+	# Record activity start time for user response time calculation
 	current_activity_start_time = Time.get_ticks_msec()
 
 	# Emit activity changed with the new activity data
@@ -137,8 +146,8 @@ func submit_answer(answer: String):
 
 	loading_started.emit()
 
-	# Calculate latency in milliseconds
-	var latency_ms = Time.get_ticks_msec() - current_activity_start_time
+	# Calculate user response time in milliseconds (time from activity shown to answer submitted)
+	var response_time_ms = Time.get_ticks_msec() - current_activity_start_time
 
 	var response = await PlaycademySdk.backend.request(
 		"POST",
@@ -146,7 +155,7 @@ func submit_answer(answer: String):
 		{
 			"itemId": current_item_id,
 			"answer": answer,
-			"latencyMs": latency_ms
+			"latencyMs": response_time_ms  # Backend expects "latencyMs" parameter name
 		}
 	)
 
@@ -167,23 +176,29 @@ func submit_answer(answer: String):
 	last_failed_operation.clear()
 
 	# Provide default feedback if backend doesn't provide it
+	# Backend should include personalized feedback, but we gracefully degrade if missing
 	var feedback = ""
-	if response.has("feedback"):
+	if response.has("feedback") and response.feedback != "":
 		feedback = response.feedback
 	else:
+		push_warning("Backend response missing feedback - using generic fallback")
 		feedback = "Great job!" if response.correct else "Not quite right. Try again!"
 
 	attempt_result.emit(response.correct, feedback)
 
 	# Wait a moment before advancing to next activity
-	await get_tree().create_timer(1.5).timeout
-	next_activity()
+	if is_inside_tree():
+		await get_tree().create_timer(1.5).timeout
+		next_activity()
+	else:
+		push_warning("SessionManager not in scene tree, skipping timer")
 
 func next_activity():
 	if not session_active:
 		return
-	
-	current_activity_index += 1
+
+	# Note: current_activity_index is incremented in _load_next_activity()
+	# to avoid double-incrementing when this function is called
 	_load_current_activity()
 
 func _end_session():
@@ -221,12 +236,17 @@ func _end_session():
 		current_session_id = ""
 		activities = []
 		current_activity_index = 0
-		# Emit a basic session ended signal so UI can transition
-		session_ended.emit({"error": true, "total_activities": 0, "correct_count": 0})
+		# Store empty summary and emit session ended signal so UI can transition
+		last_session_summary = {"error": true, "totalAttempts": 0, "correctAttempts": 0}
+		session_ended.emit(last_session_summary)
 		return
 
 	# Success - clear failed operation
 	last_failed_operation.clear()
+
+	# Store session summary for results screen
+	last_session_summary = response
+
 	session_ended.emit(response)
 
 	current_session_id = ""

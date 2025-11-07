@@ -1,0 +1,93 @@
+{
+	"meta": {
+		"generatedAt": "2025-11-07T21:33:13.786Z",
+		"tasksAnalyzed": 10,
+		"totalTasks": 10,
+		"analysisCount": 10,
+		"thresholdScore": 5,
+		"projectName": "Taskmaster",
+		"usedResearch": false
+	},
+	"complexityAnalysis": [
+		{
+			"taskId": 1,
+			"taskTitle": "Set up Cargo workspace and project structure",
+			"complexityScore": 4,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break this task into subtasks for initializing the workspace, setting up each crate (leptos-frontend, axum-backend, tauri-app), adding dependencies, and configuring tools like Trunk and just.",
+			"reasoning": "This involves setting up a multi-crate workspace with specific dependencies and tools, which requires careful configuration but is standard for Rust projects. Effort includes verifying builds, with moderate technical challenges in integrating multiple frameworks."
+		},
+		{
+			"taskId": 2,
+			"taskTitle": "Generate mock blueprint data",
+			"complexityScore": 2,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "No expansion needed as this is a straightforward procedural script.",
+			"reasoning": "Simple script using rand to generate JSON data; low effort, minimal dependencies, basic testing."
+		},
+		{
+			"taskId": 3,
+			"taskTitle": "Implement basic Leptos UI for file upload",
+			"complexityScore": 3,
+			"recommendedSubtasks": 1,
+			"expansionPrompt": "Break into subtasks for creating the component and integrating file reading with wasm-bindgen.",
+			"reasoning": "Basic UI component with reactive signals; moderate effort for web integration, straightforward testing."
+		},
+		{
+			"taskId": 4,
+			"taskTitle": "Implement core math processing for room detection",
+			"complexityScore": 8,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "Break into subtasks for defining structs, building the graph, detecting cycles, computing bounding boxes, and adding unit tests.",
+			"reasoning": "Involves complex graph algorithms, cycle detection, and geometry computations with petgraph and nalgebra; high technical challenges, extensive testing required."
+		},
+		{
+			"taskId": 5,
+			"taskTitle": "Create Axum backend API endpoint",
+			"complexityScore": 5,
+			"recommendedSubtasks": 2,
+			"expansionPrompt": "Break into subtasks for setting up the server and middleware, and implementing the endpoint with serialization.",
+			"reasoning": "Moderate effort for API setup, integration with core functions, and performance testing; dependencies on task 4 add some complexity."
+		},
+		{
+			"taskId": 6,
+			"taskTitle": "Integrate backend with Leptos frontend",
+			"complexityScore": 4,
+			"recommendedSubtasks": 1,
+			"expansionPrompt": "Break into subtasks for implementing the fetch request and updating signals.",
+			"reasoning": "Involves async handling in Leptos; moderate effort, e2e testing adds some challenge."
+		},
+		{
+			"taskId": 7,
+			"taskTitle": "Add reactive canvas rendering and overlays",
+			"complexityScore": 5,
+			"recommendedSubtasks": 2,
+			"expansionPrompt": "Break into subtasks for canvas drawing and adding interactive drag functionality.",
+			"reasoning": "Web canvas rendering with mouse events; moderate technical challenges in reactivity and manual testing."
+		},
+		{
+			"taskId": 8,
+			"taskTitle": "Implement AWS integrations and stubs",
+			"complexityScore": 6,
+			"recommendedSubtasks": 2,
+			"expansionPrompt": "Break into subtasks for Textract integration and SageMaker stubs.",
+			"reasoning": "AWS SDK usage with potential real API calls; moderate effort, testing with mocks/stubs increases complexity."
+		},
+		{
+			"taskId": 9,
+			"taskTitle": "Integrate Tauri for native desktop/mobile support",
+			"complexityScore": 4,
+			"recommendedSubtasks": 2,
+			"expansionPrompt": "Break into subtasks for scaffolding the app and adding native file dialogs.",
+			"reasoning": "Wrapping existing app with Tauri; low priority but new technology, moderate effort for builds and testing."
+		},
+		{
+			"taskId": 10,
+			"taskTitle": "Add testing, benchmarking, and demo preparation",
+			"complexityScore": 7,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Break into subtasks for unit/integration tests, benchmarks, video demo, writeup, and coverage achievement.",
+			"reasoning": "Comprehensive testing and demo creation across the project; high effort, depends on all other tasks, extensive validation required."
+		}
+	]
+}

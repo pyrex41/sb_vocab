@@ -1253,5 +1253,477 @@
       "updated": "2025-11-07T02:11:02.431Z",
       "description": "Tasks for integrate context"
     }
+  },
+  "cl": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Set up Cargo workspace and project structure",
+        "description": "Initialize a Cargo workspace with separate crates for Leptos frontend, Axum backend, and Tauri stretch, including dependencies like Leptos, Axum, nalgebra, petgraph, and AWS SDK.",
+        "details": "Create a new Cargo workspace with three members: leptos-frontend, axum-backend, and tauri-app. Add dependencies: Leptos 0.7+ for frontend, Axum 0.7+ for backend, nalgebra for geometry, petgraph for graphs, aws-sdk-rust for AWS integrations, and Tauri 2.0+ for native. Set up Trunk for WASM builds and just for task running. Ensure Rust 1.80+ is used.",
+        "testStrategy": "Verify workspace builds successfully with 'cargo build' and check that all crates compile without errors.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Initialize Cargo workspace",
+            "description": "Create a new Cargo workspace with three members: leptos-frontend, axum-backend, and tauri-app.",
+            "dependencies": [],
+            "details": "Run 'cargo new --lib workspace-name' to create the workspace root, then add [workspace] section in Cargo.toml with members pointing to the three crate directories. Ensure Rust 1.80+ is installed and used.",
+            "status": "pending",
+            "testStrategy": "Verify that 'cargo check' runs without errors in the workspace root."
+          },
+          {
+            "id": 2,
+            "title": "Set up individual crates",
+            "description": "Create and configure the leptos-frontend, axum-backend, and tauri-app crates within the workspace.",
+            "dependencies": [
+              1
+            ],
+            "details": "For each crate, run 'cargo new crate-name --lib' in the workspace directory. Configure leptos-frontend as a library for WASM, axum-backend as a binary for server, and tauri-app as a binary for native app. Update Cargo.toml files accordingly.",
+            "status": "pending",
+            "testStrategy": "Check that each crate builds individually with 'cargo build --package crate-name'."
+          },
+          {
+            "id": 3,
+            "title": "Add dependencies and configure tools",
+            "description": "Add required dependencies to the crates and set up Trunk and just for builds and tasks.",
+            "dependencies": [
+              2
+            ],
+            "details": "In each crate's Cargo.toml, add Leptos 0.7+ to leptos-frontend, Axum 0.7+ to axum-backend, Tauri 2.0+ to tauri-app, and shared deps like nalgebra, petgraph, aws-sdk-rust. Install Trunk for WASM builds and just for task running, configure justfile for common tasks.",
+            "status": "pending",
+            "testStrategy": "Run 'cargo build' in workspace to ensure all dependencies resolve, and test Trunk build for leptos-frontend."
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Generate mock blueprint data",
+        "description": "Create a procedural Rust script to generate 50+ mock JSON blueprints with random lines representing walls, including normalized coordinates and load-bearing flags.",
+        "details": "Use rand crate to generate Vec<Line> structs where Line has start: [f64;2], end: [f64;2], is_load_bearing: bool. Normalize coordinates to 0.0-1000.0. Output to JSON files for testing. Example: Generate rectangles and L-shapes with noise.",
+        "testStrategy": "Run the script and validate output JSON against the schema; ensure 50+ files are generated and contain valid line data.",
+        "priority": "medium",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set up Rust project and dependencies",
+            "description": "Initialize a new Rust project and add necessary dependencies like rand and serde for generating and serializing mock data.",
+            "dependencies": [],
+            "details": "Create a new Cargo project using 'cargo new mock_blueprint_generator'. Add rand crate for random number generation and serde with json feature for JSON serialization. Ensure the project compiles successfully.",
+            "status": "pending",
+            "testStrategy": "Run 'cargo build' to verify the project sets up correctly and dependencies resolve without errors."
+          },
+          {
+            "id": 2,
+            "title": "Define the Line struct",
+            "description": "Create a struct to represent lines in the blueprint, including start and end coordinates and load-bearing flag.",
+            "dependencies": [
+              1
+            ],
+            "details": "Define a Line struct with fields: start: [f64; 2], end: [f64; 2], is_load_bearing: bool. Implement serialization traits using serde. Ensure coordinates are normalized to 0.0-1000.0 range.",
+            "status": "pending",
+            "testStrategy": "Write a unit test to create a Line instance and serialize it to JSON, verifying the output format."
+          },
+          {
+            "id": 3,
+            "title": "Implement shape generation functions",
+            "description": "Create functions to generate basic shapes like rectangles and L-shapes using random lines.",
+            "dependencies": [
+              2
+            ],
+            "details": "Write functions to generate Vec<Line> for rectangles (four lines forming a box) and L-shapes (three lines at right angles). Use rand to randomize dimensions within 0.0-1000.0. Ensure lines are connected properly.",
+            "status": "pending",
+            "testStrategy": "Unit tests: Generate a rectangle and L-shape, check that the lines form valid shapes and coordinates are within bounds."
+          },
+          {
+            "id": 4,
+            "title": "Add noise and randomization",
+            "description": "Introduce noise to the generated lines to make them more realistic, including random load-bearing flags.",
+            "dependencies": [
+              3
+            ],
+            "details": "Modify the generation functions to add small random perturbations to coordinates (e.g., ±5.0 units). Randomly assign is_load_bearing as true or false with a bias (e.g., 30% load-bearing). Ensure normalization is maintained.",
+            "status": "pending",
+            "testStrategy": "Generate multiple shapes with noise, inspect output for variability, and verify no coordinates exceed 0.0-1000.0."
+          },
+          {
+            "id": 5,
+            "title": "Generate and output JSON files",
+            "description": "Create the main script to generate 50+ mock blueprints and save them as JSON files.",
+            "dependencies": [
+              4
+            ],
+            "details": "Write a main function that loops to generate at least 50 Vec<Line> blueprints (mix of rectangles and L-shapes with noise). Serialize each to JSON using serde and write to separate files in an output directory. Name files like blueprint_001.json.",
+            "status": "pending",
+            "testStrategy": "Run the script, check that 50+ JSON files are created, and validate a sample file against the expected schema using a JSON validator."
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Implement basic Leptos UI for file upload",
+        "description": "Build a simple Leptos component with a file upload form to accept JSON blueprints or images/PDFs, using reactive signals for state management.",
+        "details": "Create a Leptos component with an <input type='file'> and a button to trigger upload. Use signals to store the selected file. Integrate wasm-bindgen for file reading. Display a placeholder canvas for future overlays.",
+        "testStrategy": "Test in browser: Upload a mock JSON file and verify the signal updates; check UI renders correctly without errors.",
+        "priority": "medium",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Create Leptos file upload component with wasm-bindgen integration",
+            "description": "Develop a Leptos component that includes an HTML file input element and a button to handle file uploads for JSON blueprints or images/PDFs. Use reactive signals to manage the selected file state. Integrate wasm-bindgen to read the uploaded file content asynchronously. Include a placeholder canvas element for future overlays on the blueprint.",
+            "dependencies": [],
+            "details": "In the Leptos component, define a signal for storing the selected file (e.g., use leptos::create_signal). Add an <input type='file' accept='.json,.png,.jpg,.jpeg,.pdf'> element with an on:change event handler to update the signal with the selected file. Add a button with an on:click handler to trigger file reading. Use wasm-bindgen to create a FileReader or similar to read the file as text or array buffer, depending on the file type. Handle errors gracefully and update signals accordingly. Render a <canvas> element as a placeholder with basic styling. Ensure the component is reactive and updates the UI based on signal changes.",
+            "status": "pending",
+            "testStrategy": "Test in a browser environment: Upload a sample JSON file and verify that the signal updates correctly; check that the canvas placeholder renders without errors; simulate file reading and confirm no runtime errors occur."
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Implement core math processing for room detection",
+        "description": "Develop Rust functions to parse blueprint lines, build a wall graph using petgraph, detect cycles for enclosed rooms, and compute bounding boxes with nalgebra.",
+        "details": "Define structs: Point = [f64;2], Line {start: Point, end: Point, is_load_bearing: bool}. Use petgraph to create an undirected graph from lines. Detect cycles (rooms) with petgraph algorithms, filter by area threshold. Compute bounding boxes as [min_x, min_y, max_x, max_y]. Pseudo-code: fn detect_rooms(lines: Vec<Line>) -> Vec<Room> { let graph = build_graph(lines); let cycles = find_cycles(graph); let rooms = cycles.into_iter().filter(|c| area(c) > threshold).map(|c| Room {bounding_box: compute_bbox(c), ...}).collect(); }",
+        "testStrategy": "Unit tests with cargo test: Provide mock lines, assert detected rooms match expected bounding boxes; use Criterion for performance benchmarks on 1000-line inputs.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Define data structures for points, lines, and rooms",
+            "description": "Create Rust structs for Point as [f64;2], Line with start, end points and is_load_bearing flag, and Room with bounding box.",
+            "dependencies": [],
+            "details": "Implement Point as a type alias for [f64;2]. Define Line struct with fields start: Point, end: Point, is_load_bearing: bool. Define Room struct with bounding_box: [f64;4] representing [min_x, min_y, max_x, max_y]. Ensure these are serializable if needed for JSON handling.",
+            "status": "pending",
+            "testStrategy": "Unit tests to verify struct creation and field access."
+          },
+          {
+            "id": 2,
+            "title": "Build undirected graph from blueprint lines using petgraph",
+            "description": "Develop a function to construct an undirected graph where lines represent edges between points as nodes.",
+            "dependencies": [
+              1
+            ],
+            "details": "Use petgraph::Graph with nodes as Point indices or coordinates. For each Line, add nodes for start and end if not present, then add an undirected edge. Handle floating-point precision for node equality. Function signature: fn build_graph(lines: Vec<Line>) -> Graph<Point, ()>.",
+            "status": "pending",
+            "testStrategy": "Unit tests with mock lines to assert graph structure, node count, and edge connections."
+          },
+          {
+            "id": 3,
+            "title": "Detect cycles in the graph to identify enclosed rooms",
+            "description": "Implement cycle detection using petgraph algorithms and filter cycles by area to form rooms.",
+            "dependencies": [
+              2
+            ],
+            "details": "Use petgraph's cycle detection or DFS to find all simple cycles. Compute area for each cycle using shoelace formula. Filter cycles where area > threshold (e.g., 10.0). Return Vec<Vec<Point>> for valid cycles. Function: fn find_cycles(graph: &Graph<Point, ()>) -> Vec<Vec<Point>>.",
+            "status": "pending",
+            "testStrategy": "Unit tests with known graph inputs to verify detected cycles match expected rooms; include edge cases like no cycles or small areas."
+          },
+          {
+            "id": 4,
+            "title": "Compute bounding boxes for detected rooms and add comprehensive tests",
+            "description": "For each detected room cycle, calculate the bounding box and integrate into the overall detect_rooms function.",
+            "dependencies": [
+              3
+            ],
+            "details": "For a cycle Vec<Point>, compute min_x = min of x coords, etc. Implement fn compute_bbox(cycle: &Vec<Point>) -> [f64;4]. Integrate into detect_rooms: map cycles to Room structs. Add unit tests for bbox accuracy, performance benchmarks with Criterion on large inputs, and assert against expected outputs.",
+            "status": "pending",
+            "testStrategy": "Unit tests for bbox computation on sample cycles; integration tests for full detect_rooms function with mock data; Criterion benchmarks for performance."
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Create Axum backend API endpoint",
+        "description": "Set up an Axum server with an endpoint to accept blueprint JSON, process it using the core math functions, and return detected rooms as JSON.",
+        "details": "Define an Axum route POST /detect-rooms accepting JSON Vec<Line>, call the detect_rooms function, serialize output Vec<Room> with serde. Add tower middleware for logging and CORS. Run server on localhost:3000.",
+        "testStrategy": "Integration tests: Send POST requests with mock JSON using reqwest or curl, verify response JSON matches expected rooms; measure latency <30s.",
+        "priority": "high",
+        "dependencies": [
+          4
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set up Axum server with logging and CORS middleware",
+            "description": "Initialize an Axum server instance, configure it to run on localhost:3000, and integrate Tower middleware for request logging and CORS handling to enable cross-origin requests from the frontend.",
+            "dependencies": [
+              4
+            ],
+            "details": "Create a new Axum application with a router, add tower::ServiceBuilder layers for logging (using tower_http::trace::TraceLayer) and CORS (using tower_http::cors::CorsLayer with permissive settings for development). Set up the server to bind to 127.0.0.1:3000 and handle graceful shutdown. Ensure dependencies like axum, tower, and tower-http are added to Cargo.toml.",
+            "status": "pending",
+            "testStrategy": null
+          },
+          {
+            "id": 2,
+            "title": "Implement POST /detect-rooms endpoint with JSON serialization",
+            "description": "Define a POST route at /detect-rooms that accepts JSON input of Vec<Line>, processes it by calling the detect_rooms function from the core math module, and returns the output as serialized JSON Vec<Room>.",
+            "dependencies": [
+              4
+            ],
+            "details": "Add a handler function to the Axum router that deserializes the incoming JSON body into Vec<Line> using serde, invokes the detect_rooms function (assuming it's available from task 4), serializes the resulting Vec<Room> back to JSON, and returns it with appropriate HTTP status codes. Handle errors gracefully, such as invalid JSON or processing failures, by returning error responses. Ensure the endpoint is properly integrated into the server setup from the previous subtask.",
+            "status": "pending",
+            "testStrategy": null
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Integrate backend with Leptos frontend",
+        "description": "Connect the Leptos upload component to call the Axum API, fetch detected rooms, and update signals for rendering.",
+        "details": "In Leptos, on upload, send fetch request to Axum endpoint with file data. Parse response JSON into signals for room data. Handle async with Leptos' resource or effect.",
+        "testStrategy": "E2E test: Upload file in browser, verify API call succeeds, and signals update with room data; check for errors in network tab.",
+        "priority": "high",
+        "dependencies": [
+          3,
+          5
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement fetch request to Axum API and update Leptos signals",
+            "description": "In the Leptos upload component, upon file upload, send an asynchronous fetch request to the Axum backend endpoint with the file data. Parse the JSON response containing detected rooms and update the reactive signals to store this data for rendering.",
+            "dependencies": [],
+            "details": "Use Leptos' resource or effect to handle the async fetch. Construct the request with the file data (e.g., FormData). On response, deserialize JSON into a struct representing room data. Update signals to trigger reactive UI updates. Ensure error handling for network failures or invalid responses.",
+            "status": "pending",
+            "testStrategy": "E2E test: Upload a file in the browser, verify the API call succeeds via network tab, and confirm signals update with room data; check for proper error handling on failures."
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Add reactive canvas rendering and overlays",
+        "description": "Implement canvas rendering in Leptos to display blueprint lines and overlay detected room bounding boxes, with drag functionality using signals.",
+        "details": "Use web-sys or plotters to draw lines on <canvas>. Overlay rectangles for bounding boxes. Add mouse events for dragging boxes, updating signals. Ensure reactive updates on room data changes.",
+        "testStrategy": "Manual testing: Load blueprint, verify overlays appear; drag boxes and confirm coordinates update in signals.",
+        "priority": "medium",
+        "dependencies": [
+          6
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement canvas drawing for blueprint lines and room overlays",
+            "description": "Set up canvas rendering in Leptos to draw blueprint lines and overlay rectangles for detected room bounding boxes using web-sys or plotters.",
+            "dependencies": [],
+            "details": "Use web-sys to access the HTML canvas element and draw lines based on blueprint data. Overlay rectangles for each room's bounding box. Ensure the drawing reacts to changes in room data signals.",
+            "status": "pending",
+            "testStrategy": "Manual testing: Load a blueprint and verify that lines and overlays appear correctly on the canvas."
+          },
+          {
+            "id": 2,
+            "title": "Add interactive drag functionality for room bounding boxes",
+            "description": "Implement mouse event handlers on the canvas to enable dragging of room bounding boxes, updating the corresponding signals.",
+            "dependencies": [
+              1
+            ],
+            "details": "Attach mouse event listeners (mousedown, mousemove, mouseup) to the canvas. On drag, calculate new positions and update the room data signals. Ensure dragging updates the overlays reactively.",
+            "status": "pending",
+            "testStrategy": "Manual testing: Drag room boxes on the canvas and confirm that coordinates update in the signals and overlays move accordingly."
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Implement AWS integrations and stubs",
+        "description": "Add support for AWS Textract for PDF/image line extraction and SageMaker for optional ML, with stubs for development.",
+        "details": "Use aws-sdk-rust to call Textract on uploaded files, extract lines into Vec<Line>. For SageMaker, stub endpoints. Integrate into backend processing pipeline.",
+        "testStrategy": "Unit tests: Mock AWS responses, verify line extraction accuracy; integration tests with real AWS (if possible) or stubs.",
+        "priority": "medium",
+        "dependencies": [
+          5
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Integrate AWS Textract for PDF/Image Line Extraction",
+            "description": "Implement AWS Textract integration to extract lines from uploaded PDF or image files using aws-sdk-rust, converting results into a Vec<Line> structure for further processing in the backend pipeline.",
+            "dependencies": [
+              5
+            ],
+            "details": "Use aws-sdk-rust to authenticate and call Textract's AnalyzeDocument API on uploaded files. Parse the response to extract line geometries and text, mapping them to Vec<Line> structs with start and end points. Handle errors gracefully and ensure compatibility with the existing file upload flow. Integrate this into the backend processing pipeline after file upload.",
+            "status": "pending",
+            "testStrategy": "Unit tests with mocked AWS responses to verify accurate line extraction; integration tests using stubs or real AWS calls to ensure pipeline integration works correctly."
+          },
+          {
+            "id": 2,
+            "title": "Implement SageMaker Stubs for Optional ML Features",
+            "description": "Create stub endpoints for AWS SageMaker to simulate optional machine learning functionalities, allowing development without real API calls, and prepare for future integration.",
+            "dependencies": [
+              5
+            ],
+            "details": "Develop stub functions in Rust that mimic SageMaker endpoints for ML tasks, such as returning mock predictions or classifications. Use conditional compilation or configuration flags to switch between stubs and real AWS calls. Ensure stubs are integrated into the backend pipeline as optional steps, with clear interfaces for extensibility.",
+            "status": "pending",
+            "testStrategy": "Unit tests to validate stub responses match expected formats; integration tests to confirm stubs do not interfere with the processing pipeline and can be toggled on/off."
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Integrate Tauri for native desktop/mobile support",
+        "description": "Wrap the Leptos app in Tauri for native builds, adding file pickers and offline processing commands.",
+        "details": "Use Tauri 2.0+ to scaffold the app. Add #[tauri::command] for backend functions. Implement native file dialogs for uploads. Enable offline mode by running processing locally.",
+        "testStrategy": "Build and run Tauri app: Test file picker on desktop, verify processing works offline; check mobile builds on emulators.",
+        "priority": "low",
+        "dependencies": [
+          6,
+          7
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Scaffold Tauri app for Leptos integration",
+            "description": "Set up Tauri 2.0+ to wrap the existing Leptos frontend, creating the necessary project structure and configuration for native builds.",
+            "dependencies": [],
+            "details": "Initialize a new Tauri project within the Cargo workspace, configure tauri.conf.json to point to the Leptos frontend crate, and set up build scripts to compile the app for desktop and mobile platforms using Tauri's CLI tools.",
+            "status": "pending",
+            "testStrategy": "Build the Tauri app using 'cargo tauri build' and verify that the app launches successfully on the target platform without errors."
+          },
+          {
+            "id": 2,
+            "title": "Implement native file dialogs for uploads",
+            "description": "Add Tauri commands to enable native file picker dialogs for selecting files to upload in the app.",
+            "dependencies": [
+              1
+            ],
+            "details": "Create a #[tauri::command] function in the Tauri backend that uses Tauri's dialog API to open a native file picker, allowing selection of files. Expose this command to the frontend and integrate it with the Leptos upload component for seamless file selection.",
+            "status": "pending",
+            "testStrategy": "Test the file picker by triggering it from the UI, selecting a file, and verifying that the file path is returned and processed correctly in the app."
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Add testing, benchmarking, and demo preparation",
+        "description": "Implement comprehensive tests, benchmarks, and prepare demo artifacts including video and writeup.",
+        "details": "Achieve 80%+ test coverage with cargo-tarpaulin. Use Criterion for benchmarks on latency and throughput. Create 2-min demo video showing web and Tauri usage. Write technical writeup on methodology.",
+        "testStrategy": "Run all tests and benchmarks; validate demo video and writeup for completeness; ensure IoU accuracy >90% on mocks.",
+        "priority": "medium",
+        "dependencies": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement unit and integration tests",
+            "description": "Develop comprehensive unit tests for core functions like room detection and AWS integrations, and integration tests for the full pipeline including file upload and processing.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9
+            ],
+            "details": "Write unit tests using cargo test for functions in task 4 (room detection) and task 8 (AWS stubs), mocking inputs and verifying outputs like bounding boxes and line extractions. Create integration tests that simulate file uploads through the Leptos UI, process them via the backend, and check end-to-end accuracy. Ensure tests cover error handling and edge cases.",
+            "status": "pending",
+            "testStrategy": "Run cargo test to execute all unit and integration tests, verifying pass rates and output correctness against expected results."
+          },
+          {
+            "id": 2,
+            "title": "Implement benchmarks using Criterion",
+            "description": "Set up performance benchmarks for latency and throughput of the core processing pipeline, focusing on room detection and AWS integrations.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9
+            ],
+            "details": "Use the Criterion crate to benchmark key functions: latency for parsing blueprints and detecting rooms on varying input sizes (e.g., 100-1000 lines), and throughput for processing multiple files concurrently. Integrate benchmarks into the CI pipeline and measure improvements over iterations.",
+            "status": "pending",
+            "testStrategy": "Execute benchmarks with cargo bench, record metrics, and compare against baseline performance thresholds to ensure no regressions."
+          },
+          {
+            "id": 3,
+            "title": "Create 2-minute demo video",
+            "description": "Produce a short video demonstrating the web and Tauri application usage, showcasing file upload, processing, and results display.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9
+            ],
+            "details": "Record a 2-minute video using screen capture tools, showing the Leptos web UI for uploading JSON blueprints or images/PDFs, processing them to detect rooms, and displaying overlays. Include Tauri desktop app usage if applicable. Edit for clarity, add voiceover explaining features, and ensure it highlights latency and accuracy.",
+            "status": "pending",
+            "testStrategy": "Review the video for completeness, timing, and clarity; validate that it accurately demonstrates the application's functionality without errors."
+          },
+          {
+            "id": 4,
+            "title": "Write technical writeup on methodology",
+            "description": "Compose a detailed technical document explaining the project's methodology, including algorithms for room detection, AWS integrations, and testing approaches.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9
+            ],
+            "details": "Write a writeup covering the math processing for room detection using petgraph and nalgebra, AWS Textract and SageMaker integrations, testing strategies, benchmarking results, and demo preparation. Include pseudo-code, diagrams, and references to crates used. Aim for 5-10 pages in Markdown or PDF format.",
+            "status": "pending",
+            "testStrategy": "Proofread the writeup for technical accuracy, completeness, and coherence; ensure it aligns with the implementation details and can be understood by technical audiences."
+          },
+          {
+            "id": 5,
+            "title": "Achieve 80%+ test coverage with cargo-tarpaulin",
+            "description": "Run coverage analysis and add tests to reach at least 80% code coverage across the project.",
+            "dependencies": [
+              1
+            ],
+            "details": "Use cargo-tarpaulin to generate coverage reports, identify uncovered lines, and write additional unit tests for low-coverage areas like error handling in AWS integrations and edge cases in room detection. Iterate until coverage exceeds 80%, focusing on critical paths.",
+            "status": "pending",
+            "testStrategy": "Generate coverage reports with cargo-tarpaulin, verify the percentage meets the 80% threshold, and ensure all new tests pass."
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "created": "2025-11-07T21:00:13.787Z",
+      "updated": "2025-11-07T21:00:13.787Z",
+      "description": "Tasks for cl context"
+    }
   }
 }

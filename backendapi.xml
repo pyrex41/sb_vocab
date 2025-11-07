@@ -1,0 +1,2308 @@
+This file is a merged representation of a subset of the codebase, containing specifically included files, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of a subset of the repository's contents that is considered the most important context.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Only files matching these patterns are included: api/
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+api/
+  scripts/
+    genai/
+      create-batch-from-csv.ts
+      export-bundles.ts
+      ingest-exported-bundles.ts
+      ingest-from-s3.ts
+      run-jobs-two-pass.ts
+      test-sprint-workflow.ts
+    legacy/
+      ingest-from-railway-bucket.ts
+      upload-media-to-railway.ts
+    maintenance/
+      backfill-sentence-options.ts
+    test/
+      test-full-gen.ts
+      test-openai-gen.ts
+    verify/
+      verify-activities.ts
+    README.md
+  index.ts
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="api/scripts/legacy/ingest-from-railway-bucket.ts">
+/* eslint-disable no-console */
+/**
+ * Ingest generated word.json files from a Railway Bucket (S3-compatible)
+ * and populate Postgres. Media URLs are rewritten to the bucket's public URL.
+ *
+ * Required env vars (from your Railway Bucket service variables):
+ *   BUCKET                - bucket name
+ *   ENDPOINT              - S3 endpoint (e.g. https://b1.us-east-1.storage.railway.app)
+ *   ACCESS_KEY_ID
+ *   SECRET_ACCESS_KEY
+ *
+ * Optional env vars:
+ *   BUCKET_PUBLIC_BASE_URL - Public base URL for objects.
+ *                            If not set, will default to `${ENDPOINT}/${BUCKET}` (path-style)
+ *   DRY_RUN                - If 'true', prints what would be ingested without DB writes
+ *
+ * Usage:
+ *   railway run bun run api/scripts/ingest-from-railway-bucket.ts
+ */
+
+import { S3Client, ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
+import type { ListObjectsV2CommandOutput } from "@aws-sdk/client-s3";
+import { Readable } from "node:stream";
+import { z } from "zod";
+// import { fileURLToPath } from "node:url";
+// import path from "node:path";
+
+import { db, word as wordTable } from "../data";
+import { eq } from "drizzle-orm";
+import { WORD_STATUS, MEDIA_LICENSE } from "../data/content/constants";
+import {
+  createCourse,
+  getAllCourses,
+  getCourseById,
+  createLesson,
+  addWordToLesson,
+} from "../services/curriculum/index";
+import {
+  createOrFindMorphElement,
+  attachMorphologyToWord,
+  createExample,
+  // createClozeOption, // REMOVED: cloze no longer supported
+  createLexicalRelation,
+  createOrthVariant,
+} from "../services/content/index";
+
+// const __filename = fileURLToPath(import.meta.url);
+// const __dirname = path.dirname(__filename);
+
+const BUCKET = process.env["BUCKET"];
+const ENDPOINT = process.env["ENDPOINT"];
+const ACCESS_KEY_ID = process.env["ACCESS_KEY_ID"];
+const SECRET_ACCESS_KEY = process.env["SECRET_ACCESS_KEY"];
+const PUBLIC_BASE =
+  (process.env["BUCKET_PUBLIC_BASE_URL"] ||
+    (ENDPOINT && BUCKET && `${ENDPOINT.replace(/\/$/, "")}/${BUCKET}`)) ??
+  "";
+const DRY_RUN = /^true$/i.test(process.env["DRY_RUN"] ?? "false");
+
+if (!BUCKET || !ENDPOINT || !ACCESS_KEY_ID || !SECRET_ACCESS_KEY) {
+  console.error(
+    "❌ Missing Railway Bucket credentials. Required: BUCKET, ENDPOINT, ACCESS_KEY_ID, SECRET_ACCESS_KEY"
+  );
+  process.exit(1);
+}
+
+if (!PUBLIC_BASE) {
+  console.warn(
+    "⚠️  BUCKET_PUBLIC_BASE_URL not set. Falling back to path-style:",
+    `${ENDPOINT}/${BUCKET}`
+  );
+}
+
+const s3 = new S3Client({
+  region: "us-east-1",
+  endpoint: ENDPOINT,
+  forcePathStyle: true,
+  credentials: {
+    accessKeyId: ACCESS_KEY_ID,
+    secretAccessKey: SECRET_ACCESS_KEY,
+  },
+});
+
+// Schema must match generated word.json
+const WordFileSchema = z.object({
+  grade: z.number().int(),
+  courseTitle: z.string(),
+  lessonTitle: z.string(),
+  orderHint: z.number().int().positive().optional(),
+  generatedAt: z.string(),
+  item: z.object({
+    headword: z.string(),
+    lang: z.string(),
+    pos: z.enum([
+      "noun",
+      "verb",
+      "adjective",
+      "adverb",
+      "preposition",
+      "conjunction",
+      "interjection",
+      "pronoun",
+      "proper_noun",
+      "determiner",
+      "particle",
+    ]),
+    primaryDefinition: z.string(),
+    senses: z.array(
+      z.object({
+        definition: z.string(),
+        isPrimary: z.boolean().optional(),
+        orderNo: z.number().int().positive().optional(),
+      })
+    ),
+    morphology: z
+      .array(
+        z.object({
+          type: z.enum(["prefix", "root", "suffix"]),
+          value: z.string(),
+          gloss: z.string().optional(),
+          orderNo: z.number().int().positive().optional(),
+        })
+      )
+      .optional(),
+    examples: z.array(
+      z.object({
+        kind: z.enum(["correct_usage", "incorrect_usage"]), // "cloze" removed
+        text: z.string(),
+        senseOrderNo: z.number().int().positive().optional(),
+        orderNo: z.number().int().positive().optional(),
+        source: z.string().optional(),
+        notes: z.string().optional(),
+        // clozeOptions removed - no longer supported
+      })
+    ),
+    orthVariants: z
+      .array(
+        z.object({
+          form: z.string(),
+          region: z.enum(["US", "UK", "CA", "AU", "NZ", "ZA"]).optional(),
+          isPreferred: z.boolean().optional(),
+        })
+      )
+      .optional(),
+    synonyms: z.array(z.string()).optional(),
+    antonyms: z.array(z.string()).optional(),
+    homophones: z.array(z.string()).optional(),
+    confusables: z.array(z.string()).optional(),
+    imagePrompt: z.string(),
+    imageAltText: z.string(),
+    ipa: z.object({ us: z.string().optional(), uk: z.string().optional() }).optional(),
+  }),
+  media: z.object({
+    illustration: z.object({
+      file: z.string(),
+      url: z.string(),
+      mimeType: z.string(),
+      role: z.literal("illustration"),
+    }),
+    pronunciations: z.array(
+      z.object({
+        kind: z.literal("audio"),
+        voice: z.string(),
+        file: z.string(),
+        url: z.string(),
+        mimeType: z.string(),
+        role: z.union([z.literal("word_pronunciation"), z.literal("alt_pronunciation")]),
+        orderNo: z.number().int().positive().optional(),
+      })
+    ),
+    sentenceAudio: z
+      .array(
+        z.object({
+          kind: z.literal("audio"),
+          voice: z.string(),
+          file: z.string(),
+          url: z.string(),
+          mimeType: z.string(),
+          role: z.literal("sentence_audio"),
+          exampleOrderNo: z.number().int().positive(),
+          orderNo: z.number().int().positive().optional(),
+        })
+      )
+      .optional(),
+  }),
+});
+
+type WordFile = z.infer<typeof WordFileSchema>;
+
+function toPublicUrl(origUrl: string): string {
+  // Replace /static/media/... with bucket path: ${PUBLIC_BASE}/media/...
+  // The generated JSON sets url like: /static/media/<relative>
+  const marker = "/static/";
+  const idx = origUrl.indexOf(marker);
+  if (idx === 0) {
+    const rest = origUrl.slice(marker.length); // e.g., media/grade-3/...
+    return `${(PUBLIC_BASE || "").replace(/\/$/, "")}/${rest.replace(/^\//, "")}`;
+  }
+  // If it's already absolute, return as-is
+  if (/^https?:\/\//i.test(origUrl)) return origUrl;
+  // Fallback: join path-style
+  return `${(PUBLIC_BASE || "").replace(/\/$/, "")}/${origUrl.replace(/^\//, "")}`;
+}
+
+function rewriteMediaUrls(data: WordFile): WordFile {
+  return {
+    ...data,
+    media: {
+      ...data.media,
+      illustration: {
+        ...data.media.illustration,
+        url: toPublicUrl(data.media.illustration.url),
+      },
+      pronunciations: (data.media.pronunciations || []).map((p) => ({
+        ...p,
+        url: toPublicUrl(p.url),
+      })),
+      sentenceAudio: (data.media.sentenceAudio || []).map((sa) => ({
+        ...sa,
+        url: toPublicUrl(sa.url),
+      })),
+    },
+  };
+}
+
+type ToStringCapable = { transformToString?: () => Promise<string> };
+
+async function streamToString(stream: Readable | ToStringCapable): Promise<string> {
+  if (typeof (stream as ToStringCapable).transformToString === "function") {
+    return await (stream as ToStringCapable).transformToString!();
+  }
+  const readable = stream as Readable;
+  const chunks: Buffer[] = [];
+  for await (const chunk of readable as AsyncIterable<Buffer | Uint8Array | string>) {
+    if (typeof chunk === "string") {
+      chunks.push(Buffer.from(chunk));
+    } else {
+      chunks.push(Buffer.from(chunk));
+    }
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+async function listWordJsonKeys(prefix = "media/"): Promise<string[]> {
+  const keys: string[] = [];
+  let continuationToken: string | undefined = undefined;
+  do {
+    const res: ListObjectsV2CommandOutput = await s3.send(
+      new ListObjectsV2Command({
+        Bucket: BUCKET,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      })
+    );
+    const contents = Array.isArray(res.Contents)
+      ? (res.Contents as Array<{ Key?: string | undefined }>)
+      : [];
+    const pageKeys = contents
+      .map((o) => (typeof o?.Key === "string" ? o.Key : undefined))
+      .filter((k): k is string => typeof k === "string" && k.length > 0)
+      .filter((k) => k.endsWith("/word.json"));
+    keys.push(...pageKeys);
+    continuationToken = res.IsTruncated ? res.NextContinuationToken : undefined;
+  } while (continuationToken);
+  return keys;
+}
+
+async function fetchJsonFromBucket(key: string): Promise<WordFile> {
+  const res = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
+  const body = res.Body as Readable | ToStringCapable | null | undefined;
+  if (!body) {
+    throw new Error(`Empty object body for s3://${BUCKET}/${key}`);
+  }
+  const text = await streamToString(body);
+  const parsed = WordFileSchema.parse(JSON.parse(text));
+  return rewriteMediaUrls(parsed);
+}
+
+type PendingRelation = {
+  relationType: "synonym" | "antonym" | "homophone" | "confusable";
+  fromHead: string;
+  toHead: string;
+  courseTitle: string;
+};
+
+async function ingestOne(data: WordFile, rels: PendingRelation[]) {
+  const { grade, courseTitle, lessonTitle, orderHint } = data;
+
+  // 1) Find or create course
+  const courses = await getAllCourses();
+  let course = courses.find((c) => c.title === courseTitle);
+  if (!course) {
+    const newCourse = await createCourse({
+      grade,
+      title: courseTitle,
+      status: "active",
+      defaultNewWordsPerSession: 3,
+    });
+    course = { ...newCourse, lessonCount: 0 };
+  }
+
+  // 2) Find or create lesson
+  const courseWithLessons = await getCourseById(course.courseId);
+  let lesson = courseWithLessons?.lessons?.find((l) => l.title === lessonTitle);
+  if (!lesson) {
+    const newLesson = await createLesson({
+      courseId: course.courseId,
+      title: lessonTitle,
+      targetNewPerSession: 3,
+    });
+    // @ts-expect-error - Augmenting return type with wordCount for consistency
+    lesson = { ...newLesson, wordCount: 0 };
+  }
+
+  // 3) Find or create word
+  const existingWord = await db
+    .select()
+    .from(wordTable)
+    .where(eq(wordTable.headword, data.item.headword))
+    .limit(1);
+  let word;
+  if (existingWord[0]) {
+    console.log(`  ⚠️  Word "${data.item.headword}" already exists, skipping re-creation`);
+    word = existingWord[0];
+    return; // do not re-create senses/examples/media if word exists
+  } else {
+    // Create word + senses atomically in transaction
+    word = await db.transaction(async (tx) => {
+      const { word: wTable, wordSense } = await import("../data");
+      const [newWord] = await tx
+        .insert(wTable)
+        .values({
+          headword: data.item.headword,
+          lang: data.item.lang,
+          pos: data.item.pos,
+          definition: data.item.primaryDefinition,
+          status: WORD_STATUS.LIVE,
+        })
+        .returning();
+      if (!newWord) throw new Error(`Failed to create word: ${data.item.headword}`);
+
+      const sensesSorted = (data.item.senses ?? []).sort(
+        (a, b) => (a.orderNo ?? 1) - (b.orderNo ?? 1)
+      );
+      let primaryDone = false;
+      for (const s of sensesSorted) {
+        const isPrimary = (s.isPrimary ?? false) && !primaryDone;
+        await tx.insert(wordSense).values({
+          wordId: newWord.wordId,
+          definition: s.definition,
+          orderNo: s.orderNo ?? 1,
+          isPrimary,
+        });
+        if (isPrimary) primaryDone = true;
+      }
+      return newWord;
+    });
+  }
+
+  // 4) Morphology
+  for (const m of data.item.morphology ?? []) {
+    const morph = await createOrFindMorphElement({
+      type: m.type,
+      value: m.value,
+      ...(m.gloss && { gloss: m.gloss }),
+      lang: "en",
+    });
+    await attachMorphologyToWord({
+      wordId: word.wordId,
+      morphId: morph.morphId,
+      orderNo: m.orderNo ?? 1,
+    });
+  }
+
+  // 5) Examples
+  for (const ex of data.item.examples) {
+    await createExample({
+      wordId: word.wordId,
+      kind: ex.kind,
+      text: ex.text,
+      orderNo: ex.orderNo ?? 1,
+      status: WORD_STATUS.LIVE,
+      ...(ex.source && { source: ex.source }),
+      ...(ex.notes && { notes: ex.notes }),
+    });
+    // REMOVED: Cloze option insertion - no longer supported (exRec no longer needed)
+    // if (ex.kind === "cloze") {
+    //   for (const opt of ex.clozeOptions ?? []) {
+    //     await createClozeOption({
+    //       exampleId: exRec.exampleId,
+    //       text: opt.text,
+    //       isCorrect: opt.isCorrect,
+    //       orderNo: opt.orderNo ?? 1,
+    //     });
+    //   }
+    // }
+  }
+
+  // 6) Media (illustration + pronunciations + sentence audio)
+  const ill = data.media.illustration;
+  await db.transaction(async (tx) => {
+    const { media: mediaTable, wordMedia } = await import("../data");
+    const [illMedia] = await tx
+      .insert(mediaTable)
+      .values({
+        kind: "image" as const,
+        url: ill.url, // now bucket URL
+        mimeType: ill.mimeType,
+        altText: data.item.imageAltText,
+        license: MEDIA_LICENSE.UNKNOWN,
+        lang: "en",
+      })
+      .returning();
+    if (!illMedia) throw new Error("Failed to create illustration media");
+    await tx.insert(wordMedia).values({
+      wordId: word.wordId,
+      mediaId: illMedia.mediaId,
+      role: "illustration" as const,
+      orderNo: 1,
+    });
+  });
+
+  let orderNo = 1;
+  for (const p of data.media.pronunciations) {
+    await db.transaction(async (tx) => {
+      const { media: mediaTable, wordMedia } = await import("../data");
+      const [pm] = await tx
+        .insert(mediaTable)
+        .values({
+          kind: "audio" as const,
+          url: p.url,
+          mimeType: p.mimeType,
+          lang: "en",
+          accent: "US",
+          license: MEDIA_LICENSE.UNKNOWN,
+          speaker: p.voice,
+        })
+        .returning();
+      if (!pm) throw new Error("Failed to create pronunciation media");
+      await tx.insert(wordMedia).values({
+        wordId: word.wordId,
+        mediaId: pm.mediaId,
+        role: p.role,
+        orderNo: p.orderNo ?? orderNo++,
+      });
+    });
+  }
+
+  for (const sa of data.media.sentenceAudio ?? []) {
+    await db.transaction(async (tx) => {
+      const { media: mediaTable, wordMedia } = await import("../data");
+      const [sm] = await tx
+        .insert(mediaTable)
+        .values({
+          kind: "audio" as const,
+          url: sa.url,
+          mimeType: sa.mimeType,
+          lang: "en",
+          accent: "US",
+          license: MEDIA_LICENSE.UNKNOWN,
+          speaker: sa.voice,
+        })
+        .returning();
+      if (!sm) throw new Error("Failed to create sentence audio media");
+      await tx.insert(wordMedia).values({
+        wordId: word.wordId,
+        mediaId: sm.mediaId,
+        role: "sentence_audio" as const,
+        orderNo: sa.orderNo ?? 1,
+      });
+    });
+  }
+
+  // 7) Orth variants
+  for (const v of data.item.orthVariants ?? []) {
+    if (v.form.toLowerCase() === data.item.headword.toLowerCase()) continue;
+    await createOrthVariant({
+      wordId: word.wordId,
+      form: v.form,
+      ...(v.region && { region: v.region }),
+      ...(v.isPreferred !== undefined && { isPreferred: v.isPreferred }),
+    });
+  }
+
+  // 8) Map word to lesson
+  await addWordToLesson(lesson!.lessonId, { wordId: word.wordId, orderNo: orderHint ?? undefined });
+
+  // 9) Defer lexical relations until all words are present
+  for (const [type, list] of [
+    ["synonym", data.item.synonyms ?? []],
+    ["antonym", data.item.antonyms ?? []],
+    ["homophone", data.item.homophones ?? []],
+    ["confusable", data.item.confusables ?? []],
+  ] as const) {
+    for (const target of list) {
+      if (target.toLowerCase() === data.item.headword.toLowerCase()) continue;
+      rels.push({ relationType: type, fromHead: data.item.headword, toHead: target, courseTitle });
+    }
+  }
+
+  console.log(`✅ Ingested ${data.item.headword} (${courseTitle} → ${lessonTitle})`);
+}
+
+async function finalizeRelations(rels: PendingRelation[]) {
+  const words = await db.select().from(wordTable);
+  const byHeadLower = new Map(words.map((w) => [w.headword.toLowerCase(), w.wordId]));
+  for (const r of rels) {
+    const a = byHeadLower.get(r.fromHead.toLowerCase());
+    const b = byHeadLower.get(r.toHead.toLowerCase());
+    if (!a || !b) continue;
+    try {
+      await createLexicalRelation({ relationType: r.relationType, fromWordId: a, toWordId: b });
+      console.log(`  ↔ linked ${r.relationType}: ${r.fromHead} ⇄ ${r.toHead}`);
+    } catch (_e) {
+      // Likely duplicate/constraint violation (idempotent linking); ignore
+    }
+  }
+}
+
+export async function main() {
+  console.log("📥 Listing word.json objects from Railway Bucket...");
+  const keys = await listWordJsonKeys("media/");
+  if (keys.length === 0) {
+    console.log("No word.json files found in bucket under prefix 'media/'.");
+    return; // Don't exit when called from API
+  }
+  console.log(`Found ${keys.length} word.json files`);
+
+  const pending: PendingRelation[] = [];
+  for (const key of keys) {
+    try {
+      if (DRY_RUN) {
+        console.log(`[DRY RUN] Would ingest: s3://${BUCKET}/${key}`);
+        continue;
+      }
+      const data = await fetchJsonFromBucket(key);
+      await ingestOne(data, pending);
+    } catch (e) {
+      console.error(`❌ Failed to ingest ${key}`, e);
+    }
+  }
+
+  if (!DRY_RUN && pending.length > 0) {
+    console.log(`🔗 Finalizing ${pending.length} lexical relations...`);
+    await finalizeRelations(pending);
+  }
+
+  console.log("✅ Ingest complete.");
+}
+
+// When run as a script (not imported), execute main and exit
+if (import.meta.main) {
+  void main()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error("Fatal error:", err);
+      process.exit(1);
+    });
+}
+</file>
+
+<file path="api/scripts/legacy/upload-media-to-railway.ts">
+/**
+ * Upload local media files to Railway Bucket (S3-compatible)
+ *
+ * Prerequisites:
+ *   bun add @aws-sdk/client-s3
+ *
+ * Environment variables required (from Railway Bucket service):
+ *   BUCKET (bucket name)
+ *   ENDPOINT (S3 endpoint URL)
+ *   ACCESS_KEY_ID
+ *   SECRET_ACCESS_KEY
+ *
+ * Usage:
+ *   bun run api/scripts/upload-media-to-railway.ts
+ */
+
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const MEDIA_ROOT = path.resolve(__dirname, "..", "static", "media");
+
+// Railway Bucket configuration (from Railway service variables)
+const BUCKET_NAME = process.env["BUCKET"];
+const ENDPOINT = process.env["ENDPOINT"];
+const ACCESS_KEY_ID = process.env["ACCESS_KEY_ID"];
+const SECRET_ACCESS_KEY = process.env["SECRET_ACCESS_KEY"];
+
+if (!BUCKET_NAME || !ENDPOINT || !ACCESS_KEY_ID || !SECRET_ACCESS_KEY) {
+  console.error("❌ Missing Railway Bucket credentials in environment variables");
+  console.error("Required: BUCKET, ENDPOINT, ACCESS_KEY_ID, SECRET_ACCESS_KEY");
+  console.error("\nGet these from Railway → foldable-pannikin service → Variables");
+  process.exit(1);
+}
+
+// Railway Bucket is S3-compatible. Most S3-compatible providers require path-style.
+const s3Client = new S3Client({
+  region: "us-east-1", // Railway buckets use us-east-1
+  endpoint: ENDPOINT,
+  forcePathStyle: true, // critical for custom S3 endpoints
+  credentials: {
+    accessKeyId: ACCESS_KEY_ID,
+    secretAccessKey: SECRET_ACCESS_KEY,
+  },
+});
+
+async function getAllFiles(dir: string, baseDir: string = dir): Promise<string[]> {
+  const files: string[] = [];
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...(await getAllFiles(fullPath, baseDir)));
+    } else {
+      files.push(fullPath);
+    }
+  }
+
+  return files;
+}
+
+function getContentType(filePath: string): string {
+  const ext = path.extname(filePath).toLowerCase();
+  const contentTypes: Record<string, string> = {
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".ogg": "audio/ogg",
+    ".json": "application/json",
+  };
+  return contentTypes[ext] || "application/octet-stream";
+}
+
+async function uploadFile(localPath: string, s3Key: string) {
+  const fileContent = await fs.readFile(localPath);
+  const contentType = getContentType(localPath);
+
+  await s3Client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: s3Key,
+      Body: fileContent,
+      ContentType: contentType,
+      // Make objects publicly readable if your bucket supports public access
+      ACL: "public-read",
+    })
+  );
+}
+
+async function main() {
+  console.log("📤 Uploading media files to Railway Bucket...\n");
+  console.log(`📁 Source: ${MEDIA_ROOT}`);
+  console.log(`🪣 Bucket: ${BUCKET_NAME}`);
+  console.log(`🌐 Endpoint: ${ENDPOINT}\n`);
+
+  try {
+    const files = await getAllFiles(MEDIA_ROOT);
+    console.log(`Found ${files.length} files to upload\n`);
+
+    let uploaded = 0;
+    let skipped = 0;
+
+    for (const filePath of files) {
+      // Convert local path to S3 key (preserve structure under media/)
+      // e.g., /path/to/api/static/media/grade-3/lesson-1/word-1/image.png
+      //    -> grade-3/lesson-1/word-1/image.png
+      const relativePath = path.relative(MEDIA_ROOT, filePath);
+      const s3Key = `media/${relativePath}`;
+
+      try {
+        await uploadFile(filePath, s3Key);
+        uploaded++;
+
+        if (uploaded % 10 === 0) {
+          console.log(`  ✅ Uploaded ${uploaded}/${files.length}...`);
+        }
+      } catch (error) {
+        console.error(`  ❌ Failed to upload ${relativePath}:`, error);
+        skipped++;
+      }
+    }
+
+    console.log(`\n✅ Upload complete!`);
+    console.log(`  📊 Uploaded: ${uploaded}`);
+    console.log(`  ⚠️  Skipped: ${skipped}`);
+    console.log(`  📁 Total: ${files.length}`);
+    console.log(`\n🔗 Files are now in Railway Bucket: ${BUCKET_NAME}`);
+    console.log(`\n📝 Next steps:`);
+    console.log(`   1. Get the public URL from Railway Bucket settings`);
+    console.log(`   2. Update BUCKET_PUBLIC_BASE_URL env var in your app service`);
+    console.log(`   3. Update the app to construct bucket URLs dynamically`);
+
+    process.exit(0);
+  } catch (error) {
+    console.error("\n❌ Upload failed:", error);
+    process.exit(1);
+  }
+}
+
+void main();
+</file>
+
+<file path="api/scripts/maintenance/backfill-sentence-options.ts">
+/* eslint-disable no-console, @typescript-eslint/no-explicit-any */
+import { db } from "../../data/db";
+import { sql, and, eq } from "drizzle-orm";
+import {
+  example as exampleTable,
+  exampleWordOption,
+  word as wordTable,
+  lesson,
+  lessonWord,
+  course,
+  wordSynonymDistractor,
+  wordMeaningDistractor,
+} from "../../data";
+
+type ExampleRow = {
+  exampleId: string;
+  wordId: string;
+  headword: string;
+  orderNo: number;
+};
+
+async function getGradeExamples(grade: number): Promise<ExampleRow[]> {
+  const rows = await db.execute(sql`
+    SELECT e.example_id   AS "exampleId",
+           e.word_id      AS "wordId",
+           e.order_no     AS "orderNo",
+           w.headword     AS "headword"
+    FROM example e
+    JOIN "word" w       ON w.word_id = e.word_id
+    JOIN lesson_word lw  ON lw.word_id = w.word_id
+    JOIN lesson l        ON l.lesson_id = lw.lesson_id
+    JOIN course c        ON c.course_id = l.course_id
+    WHERE c.grade = ${grade}
+      AND e.kind = 'correct_usage'
+  `);
+  return rows as unknown as ExampleRow[];
+}
+
+async function countOptions(exampleId: string): Promise<number> {
+  const res = await db.execute(sql`SELECT count(*)::int AS c FROM example_word_option WHERE example_id = ${exampleId}`);
+  // Bun postgres returns array of objects
+  // @ts-ignore
+  return res[0]?.c ?? 0;
+}
+
+async function backfillOne(example: ExampleRow) {
+  // Fetch self-contained distractors
+  const synDistractors = await db
+    .select({ t: wordSynonymDistractor.distractorText })
+    .from(wordSynonymDistractor)
+    .where(eq(wordSynonymDistractor.wordId, example.wordId));
+  const meaningDistractors = await db
+    .select({ t: wordMeaningDistractor.distractorText })
+    .from(wordMeaningDistractor)
+    .where(eq(wordMeaningDistractor.wordId, example.wordId));
+
+  const pool = new Set<string>();
+  for (const r of synDistractors) if (r.t && r.t.toLowerCase() !== example.headword.toLowerCase()) pool.add(r.t);
+  for (const r of meaningDistractors)
+    if (r.t && r.t.toLowerCase() !== example.headword.toLowerCase()) pool.add(r.t);
+
+  const distractors = Array.from(pool).slice(0, 3);
+  if (distractors.length < 3) {
+    throw new Error(`Insufficient distractors for ${example.headword} (exampleId=${example.exampleId})`);
+  }
+
+  // Replace any existing options to ensure exactly four with one correct
+  await db.execute(sql`DELETE FROM example_word_option WHERE example_id = ${example.exampleId}`);
+
+  const options = [
+    { headword: example.headword, isCorrect: true },
+    ...distractors.map((d) => ({ headword: d, isCorrect: false })),
+  ];
+
+  for (let i = 0; i < options.length; i++) {
+    await db.insert(exampleWordOption).values({
+      exampleId: example.exampleId,
+      headword: options[i]!.headword,
+      isCorrect: options[i]!.isCorrect,
+      orderNo: i + 1,
+    });
+  }
+}
+
+async function main() {
+  const grade = parseInt(process.argv[2] ?? "3", 10);
+  console.log(`🔧 Backfilling sentence options for Grade ${grade}...`);
+
+  const examples = await getGradeExamples(grade);
+  console.log(`Found ${examples.length} correct_usage examples`);
+
+  let fixed = 0;
+  let skipped = 0;
+  let failed = 0;
+
+  for (const ex of examples) {
+    const cnt = await countOptions(ex.exampleId);
+    if (cnt === 4) {
+      skipped++;
+      continue;
+    }
+    try {
+      await backfillOne(ex);
+      fixed++;
+    } catch (e) {
+      failed++;
+      console.log(`  ❌ ${ex.headword} (ex#${ex.orderNo}): ${(e as Error).message}`);
+    }
+  }
+
+  console.log(`\n✅ Backfill complete: fixed=${fixed}, skipped=${skipped}, failed=${failed}`);
+}
+
+void main();
+</file>
+
+<file path="api/scripts/test/test-full-gen.ts">
+/* eslint-disable no-console */
+import { generateWordBundle } from "../services/genai/generator";
+
+async function main() {
+  try {
+    const bundle = await generateWordBundle({
+      batchId: "test-batch",
+      jobId: "test-job",
+      headword: "emerald",
+      grade: 3,
+      courseTitle: "Grade 3",
+      lessonTitle: "Lesson 1",
+    });
+    console.log("SUCCESS");
+    console.log("Headword:", bundle.item.headword);
+    console.log("Def:", bundle.item.primaryDefinition);
+    console.log("Senses:", bundle.item.senses.length);
+    console.log("Examples:", bundle.item.examples.length);
+    console.log("Illustration URL:", bundle.media.illustration.url);
+    console.log("Pronunciations:", bundle.media.pronunciations.length);
+  } catch (e) {
+    console.error("FAILED:", e instanceof Error ? e.message : String(e));
+    process.exit(1);
+  }
+}
+
+void main();
+</file>
+
+<file path="api/scripts/test/test-openai-gen.ts">
+/* eslint-disable no-console */
+import OpenAI from "openai";
+
+async function main() {
+  const OPENAI_API_KEY = process.env["OPENAI_API_KEY"];
+  if (!OPENAI_API_KEY) throw new Error("Missing OPENAI_API_KEY");
+
+  const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
+
+  const resp = await openai.responses.create({
+    model: "gpt-4o-mini",
+    instructions: "You are generating K-12 vocabulary content. Return JSON.",
+    input: "headword: tomato\ngrade: 3\nTask: Produce a JSON object with {headword, pos, primaryDefinition}",
+    text: { format: { type: "json_schema", name: "simple", schema: { type: "object", additionalProperties: false, properties: { headword: { type: "string" }, pos: { type: "string" }, primaryDefinition: { type: "string" } }, required: ["headword", "pos", "primaryDefinition"] } } },
+  });
+
+  const jsonText = (resp as { output_text?: string }).output_text ?? "";
+  console.log("JSON:", jsonText);
+  const parsed = JSON.parse(jsonText);
+  console.log("Parsed:", parsed);
+}
+
+void main();
+</file>
+
+<file path="api/scripts/verify/verify-activities.ts">
+/* eslint-disable no-console, @typescript-eslint/no-explicit-any */
+import { db } from "../../data/db";
+import { course, lesson, lessonWord } from "../../data/curriculum";
+import { word as wordTable } from "../../data/content";
+import { eq, and, sql } from "drizzle-orm";
+
+// Side-effect: registers all handlers in the global registry
+import "../../services/activities/index";
+import { ACTIVITY_HANDLERS } from "../../services/activities/base";
+
+type WordRow = {
+  wordId: string;
+  headword: string;
+  lessonId: string;
+  lessonTitle: string;
+  courseId: string;
+};
+
+async function getGrade3Words(): Promise<WordRow[]> {
+  // Find Grade 3 course
+  const [c] = await db.select().from(course).where(eq(course.grade, 3)).limit(1);
+  if (!c) throw new Error("Grade 3 course not found");
+
+  // Join lessons → lesson_word → word
+  const rows = await db.execute(sql`
+    SELECT w.word_id AS "wordId",
+           w.headword AS "headword",
+           l.lesson_id AS "lessonId",
+           l.title AS "lessonTitle",
+           l.course_id AS "courseId"
+    FROM lesson l
+    JOIN lesson_word lw ON lw.lesson_id = l.lesson_id
+    JOIN "word" w ON w.word_id = lw.word_id
+    WHERE l.course_id = ${c.courseId}
+    ORDER BY l.order_no, lw.order_no
+  `);
+  // Bun postgres returns array
+  return rows as unknown as WordRow[];
+}
+
+async function run() {
+  console.log("🔎 Verifying activities for Grade 3 content...\n");
+
+  const words = await getGrade3Words();
+  console.log(`📚 Words found: ${words.length}`);
+
+  const activityTypes = Object.keys(ACTIVITY_HANDLERS);
+  console.log(`🧩 Activities: ${activityTypes.join(", ")}`);
+
+  const summary: Record<string, { ok: number; fail: number; samples: Array<{ headword: string; error: string }> }> = {};
+  for (const a of activityTypes) summary[a] = { ok: 0, fail: 0, samples: [] };
+
+  for (const w of words) {
+    for (const activity of activityTypes) {
+      const handler = ACTIVITY_HANDLERS[activity];
+      try {
+        if (typeof handler.prepareParams === "function") {
+          await handler.prepareParams!(w.wordId, w.lessonId, w.courseId);
+        } else {
+          // No prepare step: minimally validate core word fields
+          const [wr] = await db
+            .select({
+              wordId: wordTable.wordId,
+              headword: wordTable.headword,
+              pos: wordTable.pos,
+              definition: wordTable.definition,
+            })
+            .from(wordTable)
+            .where(eq(wordTable.wordId, w.wordId))
+            .limit(1);
+          if (!wr || !wr.headword || !wr.definition) {
+            throw new Error("Missing headword/definition");
+          }
+        }
+        summary[activity].ok++;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        summary[activity].fail++;
+        if (summary[activity].samples.length < 5) {
+          summary[activity].samples.push({ headword: w.headword, error: msg });
+        }
+      }
+    }
+  }
+
+  console.log("\n===== Activity Verification Summary =====\n");
+  for (const activity of activityTypes) {
+    const s = summary[activity];
+    const total = s.ok + s.fail;
+    const rate = total ? ((s.ok / total) * 100).toFixed(1) : "0.0";
+    console.log(`• ${activity}: ${s.ok}/${total} OK (${rate}%)`);
+    if (s.fail > 0) {
+      for (const sample of s.samples) {
+        console.log(`   - ${sample.headword}: ${sample.error}`);
+      }
+    }
+  }
+
+  console.log("\n✅ Done");
+}
+
+void (async () => {
+  try {
+    await run();
+    process.exit(0);
+  } catch (e) {
+    console.error(e);
+    process.exit(1);
+  }
+})();
+</file>
+
+<file path="api/scripts/README.md">
+# Scripts Directory
+
+Organized scripts for database management, content generation, and utilities.
+
+## 📂 Directory Structure
+
+```
+scripts/
+├── db/          Database schema & seeding
+├── genai/       Content generation pipeline
+├── backfill/    One-time data migrations
+├── test/        Developer test utilities
+├── legacy/      Old scripts (review for deletion)
+└── README.md    This file
+```
+
+---
+
+## 🗄️ Database Scripts (`db/`)
+
+### `migrate.ts`
+**Purpose:** Run pending Drizzle migrations
+**Usage:** `bun run db:migrate` (from package.json)
+**When:** After pulling new migrations or creating schema changes
+
+### `seed.ts`
+**Purpose:** Seed base data (orgs, users, courses, lessons, words)
+**Usage:** Called by `reset-and-seed.ts`
+**When:** After db:reset to populate test data
+
+### `reset-and-seed.ts`
+**Purpose:** Complete database reset workflow (drop all → migrate → seed)
+**Usage:** `bun run db:reset` (from package.json)
+**When:** Clean slate needed for testing
+**⚠️ Warning:** Destroys ALL data - export bundles first!
+
+### `seed-srs-progress.ts`
+**Purpose:** Create realistic SRS progress for "Bob Progress" test user
+**Usage:** Called by `seed.ts`
+**When:** Automatically run during db:reset
+
+---
+
+## 🤖 GenAI Pipeline Scripts (`genai/`)
+
+### `test-sprint-workflow.ts` 
+**Purpose:** Create a test batch with 3 sample words
+**Usage:** `bun run api/scripts/genai/test-sprint-workflow.ts`
+**When:** Quick local testing of generation pipeline
+**Alternative:** Use `POST /v1/gen/sprint` API endpoint
+
+### `run-jobs-two-pass.ts`
+**Purpose:** Manual two-pass job runner (text → media)
+**Usage:** 
+```bash
+PASS=1 bun run api/scripts/genai/run-jobs-two-pass.ts  # Text generation
+PASS=2 bun run api/scripts/genai/run-jobs-two-pass.ts  # Media generation
+```
+**When:** Local dev, debugging, or when worker isn't running
+**Alternative:** `bun run api/services/genai/worker.ts` (auto-processes both passes)
+
+### `export-bundles.ts` ⚠️ **CRITICAL**
+**Purpose:** Export generated bundles to JSON files (backup before db:reset)
+**Usage:** `bun run api/scripts/genai/export-bundles.ts <batchId|ALL>`
+**When:** **ALWAYS** before `db:reset` if you have generated content
+**Output:** `api/static/generated-backups/{batchId}/*.json`
+**Why:** S3 media persists but bundles are lost on reset - this saves them
+
+### `ingest-exported-bundles.ts` ⚠️ **CRITICAL**
+**Purpose:** Re-ingest backed-up bundles after db:reset
+**Usage:** `bun run api/scripts/genai/ingest-exported-bundles.ts api/static/generated-backups`
+**When:** After db:reset to restore generated content
+**Why:** Avoids re-generating (no API costs), restores all words + media links
+
+---
+
+## 🔧 Backfill Scripts (`backfill/`)
+
+One-time data migrations for schema changes. Safe to run multiple times (idempotent).
+
+**These are kept for reference but likely already applied to your DB.**
+
+---
+
+## 🧪 Test Scripts (`test/`)
+
+### `test-full-gen.ts`
+**Purpose:** Quick smoke test of `generateWordBundle()` function
+**Usage:** `bun run api/scripts/test/test-full-gen.ts`
+**When:** Debugging generator, testing OpenAI credentials
+
+### `test-openai-gen.ts`
+**Purpose:** Minimal OpenAI API connectivity test
+**Usage:** `bun run api/scripts/test/test-openai-gen.ts`
+**When:** Verifying API key works, debugging OpenAI errors
+
+---
+
+## 🗂️ Legacy Scripts (`legacy/`)
+
+**These scripts are from the old workflow. Review for deletion:**
+
+### `ingest-from-railway-bucket.ts`
+- Old: Import static word.json files from Railway S3
+- **Delete unless:** You sync production data to local
+
+### `upload-media-to-railway.ts`
+- Old: Manual media upload to S3
+- **Delete:** Worker auto-uploads now
+
+**Action:** Review these and delete if not needed.
+
+---
+
+## 🚀 Common Workflows
+
+### Local Development - Generate Content
+
+**Option A - Background Worker (Recommended):**
+```bash
+# Terminal 1: API
+bun run dev:api
+
+# Terminal 2: Worker (auto-processes jobs)
+bun run api/services/genai/worker.ts
+
+# Terminal 3: Create batch
+bun run api/scripts/genai/test-sprint-workflow.ts
+# Or: POST /v1/gen/sprint via UI
+```
+
+**Option B - Manual Two-Pass:**
+```bash
+# Create batch
+bun run api/scripts/genai/test-sprint-workflow.ts
+
+# Run passes
+PASS=1 bun run api/scripts/genai/run-jobs-two-pass.ts  # Text (~2min for 120 words)
+PASS=2 bun run api/scripts/genai/run-jobs-two-pass.ts  # Media (~8min for 120 words)
+```
+
+### Safe Database Reset
+
+**⚠️ IMPORTANT: Don't lose generated content!**
+
+```bash
+# 1. Export ALL generated bundles
+bun run api/scripts/genai/export-bundles.ts ALL
+
+# 2. Reset database
+bun run db:reset
+
+# 3. Re-apply new migrations (not in db:reset yet)
+psql ... < drizzle/0003_add_text_complete_status.sql
+psql ... < drizzle/0004_add_word_synonym.sql
+
+# 4. Re-ingest exported bundles
+bun run api/scripts/genai/ingest-exported-bundles.ts api/static/generated-backups
+```
+
+### Production (Railway)
+
+**Setup:**
+- Deploy API as normal
+- Add worker as separate Railway service: `bun run api/services/genai/worker.ts`
+
+**Usage:**
+- Admin UI → POST /v1/gen/sprint (create batch)
+- Worker auto-processes
+- Poll GET /v1/gen/sprint/:batchId/status
+- Review GET /v1/gen/sprint/:batchId/results
+
+---
+
+## 📝 Notes
+
+- All prompts live in `api/services/genai/prompt.ts` (code-based, version via git)
+- All counts/concurrency in `api/config/constants.ts` (tune without code changes)
+- S3 media persists across db:reset (bundles don't - must export first)
+- GenAI scripts use `/* eslint-disable */` for intentional `any` types in JSONB handling
+</file>
+
+<file path="api/scripts/genai/export-bundles.ts">
+/* eslint-disable no-console, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument */
+/**
+ * Export generated bundles to JSON files for backup/re-ingest
+ * Run this BEFORE db:reset to preserve generated content
+ */
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { db } from "../../data/db";
+import { generationJob, generationBatch } from "../../data/genai";
+import { eq } from "drizzle-orm";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const OUTPUT_DIR = path.resolve(__dirname, "..", "static", "generated-backups");
+
+async function main() {
+  const batchId = process.argv[2];
+  
+  if (!batchId) {
+    console.error("Usage: bun run api/scripts/export-bundles.ts <batchId>");
+    console.error("Or: bun run api/scripts/export-bundles.ts ALL");
+    process.exit(1);
+  }
+
+  // Get batch info
+  const batches = batchId === "ALL"
+    ? await db.select().from(generationBatch)
+    : await db.select().from(generationBatch).where(eq(generationBatch.batchId, batchId));
+
+  console.log(`📦 Exporting bundles from ${batches.length} batch(es)...\n`);
+
+  let totalExported = 0;
+
+  for (const batch of batches) {
+    const jobs = await db
+      .select()
+      .from(generationJob)
+      .where(eq(generationJob.batchId, batch.batchId));
+
+    const succeeded = jobs.filter((j) => j.status === "succeeded");
+    
+    if (succeeded.length === 0) {
+      console.log(`⚠️ Batch ${batch.batchId}: no succeeded jobs, skipping`);
+      continue;
+    }
+
+    // Create batch directory
+    const batchDir = path.join(OUTPUT_DIR, batch.batchId);
+    await fs.mkdir(batchDir, { recursive: true });
+
+    // Export batch metadata
+    await fs.writeFile(
+      path.join(batchDir, "batch.json"),
+      JSON.stringify({
+        batchId: batch.batchId,
+        scope: batch.scopeJson,
+        createdAt: batch.createdTs,
+        totalJobs: jobs.length,
+        succeeded: succeeded.length,
+      }, null, 2)
+    );
+
+    // Export each succeeded bundle
+    for (const job of succeeded) {
+      const bundle = job.outputJson;
+      if (!bundle) continue;
+
+      const headword = (bundle as any)?.item?.headword || job.targetKey;
+      const filename = `${headword.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.json`;
+      
+      await fs.writeFile(
+        path.join(batchDir, filename),
+        JSON.stringify(bundle, null, 2)
+      );
+      
+      totalExported++;
+    }
+
+    console.log(`✅ Batch ${batch.batchId}: exported ${succeeded.length} bundles`);
+  }
+
+  console.log(`\n📊 Total exported: ${totalExported} bundles`);
+  console.log(`📁 Location: ${OUTPUT_DIR}`);
+  console.log(`\n💡 To re-ingest after db:reset:`);
+  console.log(`   1. Run: bun run db:reset`);
+  console.log(`   2. Run: bun run api/scripts/ingest-exported-bundles.ts ${OUTPUT_DIR}`);
+
+  process.exit(0);
+}
+
+void main();
+</file>
+
+<file path="api/scripts/genai/ingest-exported-bundles.ts">
+/* eslint-disable no-console, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call */
+/**
+ * Re-ingest exported bundles after db:reset
+ * Reads from static/generated-backups and commits to DB
+ */
+import fs from "node:fs/promises";
+import path from "node:path";
+import { db } from "../../data/db";
+import { WordBundleSchema } from "../../services/genai/schema";
+import { commitChangeItem } from "../../services/genai/commit";
+import { contentChangeItem, contentChangeSet } from "../../data/genai";
+import { newCommitToken } from "../../services/genai/generator";
+
+async function main() {
+  const backupDir = process.argv[2];
+  
+  if (!backupDir) {
+    console.error("Usage: bun run api/scripts/ingest-exported-bundles.ts <backup-dir>");
+    process.exit(1);
+  }
+
+  console.log(`📥 Reading bundles from: ${backupDir}\n`);
+
+  const batchDirs = await fs.readdir(backupDir);
+  let totalIngested = 0;
+  let totalFailed = 0;
+
+  for (const batchDir of batchDirs) {
+    const batchPath = path.join(backupDir, batchDir);
+    const stat = await fs.stat(batchPath);
+    if (!stat.isDirectory()) continue;
+
+    console.log(`\n📦 Processing batch: ${batchDir}`);
+
+    const files = await fs.readdir(batchPath);
+    const bundleFiles = files.filter((f) => f.endsWith(".json") && f !== "batch.json");
+
+    for (const file of bundleFiles) {
+      try {
+        const raw = await fs.readFile(path.join(batchPath, file), "utf8");
+        const parsed = JSON.parse(raw);
+        const bundle = WordBundleSchema.parse(parsed);
+
+        // Create changeset item (minimal approach - bypass changeset workflow)
+        const [changeSet] = await db
+          .insert(contentChangeSet)
+          .values({ status: "approved" })
+          .returning();
+
+        if (!changeSet) {
+          throw new Error("Failed to create changeset");
+        }
+
+        const [changeItem] = await db
+          .insert(contentChangeItem)
+          .values({
+            changeSetId: changeSet.changeSetId,
+            jobId: "00000000-0000-0000-0000-000000000000", // Dummy jobId for manual imports
+            entityType: "word",
+            payloadJson: bundle,
+            status: "pending",
+          })
+          .returning();
+
+        if (!changeItem) {
+          throw new Error("Failed to create change item");
+        }
+
+        // Commit immediately
+        const token = newCommitToken();
+        await commitChangeItem(changeItem.changeItemId, token);
+
+        console.log(`  ✅ ${bundle.item.headword}`);
+        totalIngested++;
+      } catch (e) {
+        console.error(`  ❌ ${file}: ${e instanceof Error ? e.message : String(e)}`);
+        totalFailed++;
+      }
+    }
+  }
+
+  console.log(`\n📊 Summary:`);
+  console.log(`   ✅ Ingested: ${totalIngested}`);
+  console.log(`   ❌ Failed: ${totalFailed}`);
+
+  process.exit(0);
+}
+
+void main();
+</file>
+
+<file path="api/scripts/genai/test-sprint-workflow.ts">
+/* eslint-disable no-console */
+/**
+ * Create a test batch directly (for local development)
+ * Production: use POST /v1/gen/sprint via UI
+ */
+import { db } from "../../data/db";
+import { generationBatch, generationJob } from "../../data/genai";
+
+async function main() {
+  console.log("🧪 Creating test batch...\n");
+
+  // Create batch (no prompt DB dependency)
+  const [batch] = await db
+    .insert(generationBatch)
+    .values({
+      promptVersionId: "00000000-0000-0000-0000-000000000000", // Placeholder (not used)
+      scopeJson: { grade: 5, courseTitle: "Test Course", lessonTitle: "Test Lesson" },
+      status: "created",
+    })
+    .returning();
+
+  if (!batch) {
+    console.error("❌ Failed to create batch");
+    process.exit(1);
+  }
+
+  console.log(`✅ Created batch: ${batch.batchId}`);
+
+  // Create jobs
+  const words = ["resilient", "eclipse", "compare"];
+  const jobs = [];
+  for (const headword of words) {
+    try {
+      const [job] = await db
+        .insert(generationJob)
+        .values({
+          batchId: batch.batchId,
+          targetKey: headword.toLowerCase().trim(),
+          status: "queued",
+        })
+        .returning();
+      if (job) jobs.push(job);
+    } catch (e) {
+      console.log(`⚠️ Skipped duplicate: ${headword}`);
+    }
+  }
+
+  console.log(`✅ Created ${jobs.length} jobs`);
+  console.log(`\n🎯 Batch ID: ${batch.batchId}`);
+  console.log(`\nNext steps:`);
+  console.log(`Option A - Manual (two-pass):`);
+  console.log(`  1. PASS=1 bun run api/scripts/run-jobs-two-pass.ts`);
+  console.log(`  2. PASS=2 bun run api/scripts/run-jobs-two-pass.ts`);
+  console.log(`\nOption B - Auto (background worker):`);
+  console.log(`  1. bun run api/services/genai/worker.ts`);
+  console.log(`  (runs continuously, auto-processes text then media)\n`);
+
+  process.exit(0);
+}
+
+void main();
+</file>
+
+<file path="api/scripts/genai/create-batch-from-csv.ts">
+/* eslint-disable no-console */
+/**
+ * Create generation batch from CSV file
+ * Reads word lists and creates jobs for all words
+ */
+import fs from "node:fs";
+import { parse as parseCsv } from "csv-parse/sync";
+import { db } from "../../data/db";
+import { generationBatch, generationJob } from "../../data/genai";
+
+const csvFile = process.argv[2];
+const gradeArg = process.argv[3];
+
+if (!csvFile || !gradeArg) {
+  console.error("Usage: bun run api/scripts/genai/create-batch-from-csv.ts <csv-file> <grade>");
+  console.error("Example: bun run api/scripts/genai/create-batch-from-csv.ts example_data/grade_3.csv 3");
+  process.exit(1);
+}
+
+const grade = parseInt(gradeArg, 10);
+if (isNaN(grade) || grade < 1 || grade > 12) {
+  console.error("Grade must be a number between 1 and 12");
+  process.exit(1);
+}
+
+async function main() {
+  // csvFile is guaranteed to be defined due to check above
+  const file = csvFile!;
+  
+  console.log(`📖 Reading CSV: ${file}`);
+  console.log(`🎓 Grade: ${grade}\n`);
+
+  const csvContent = fs.readFileSync(file, "utf8");
+  const rows = parseCsv(csvContent, { columns: true, skip_empty_lines: true });
+
+  // Parse CSV lesson-by-lesson to preserve structure
+  type WordWithLesson = { word: string; lessonTitle: string };
+  const wordsWithLessons: WordWithLesson[] = [];
+  const lessonTitles = new Set<string>();
+
+  for (const row of rows as Array<Record<string, unknown>>) {
+    const theme = (row["Theme"] ?? row["theme"]) as string | undefined;
+    const wordsField = (row["Words (389)"] ?? row["Words"] ?? row["words"]) as string | undefined;
+
+    if (!theme || !wordsField) continue;
+    
+    const lessonTitle = theme.trim();
+    if (!lessonTitle || lessonTitle.toLowerCase().includes("delete") || lessonTitle.toLowerCase().includes("spelling word list")) {
+      continue;
+    }
+
+    lessonTitles.add(lessonTitle);
+
+    // Split by commas, handle slash pairs (e.g., "big/large" → both)
+    const words = wordsField.split(",").flatMap((part) => {
+      const trimmed = part.trim();
+      if (!trimmed) return [];
+      if (trimmed.includes("/")) {
+        return trimmed.split("/").map((w) => w.trim()).filter(Boolean);
+      }
+      return [trimmed];
+    });
+
+    for (const word of words) {
+      wordsWithLessons.push({ word: word.toLowerCase(), lessonTitle });
+    }
+  }
+
+  // Deduplicate while preserving first lesson assignment
+  const seen = new Map<string, string>();
+  for (const { word, lessonTitle } of wordsWithLessons) {
+    if (!seen.has(word)) {
+      seen.set(word, lessonTitle);
+    }
+  }
+
+  console.log(`📊 Found ${seen.size} unique words across ${lessonTitles.size} lessons\n`);
+
+  // Create ONE batch for the entire course
+  const [batch] = await db
+    .insert(generationBatch)
+    .values({
+      promptVersionId: "00000000-0000-0000-0000-000000000000",
+      scopeJson: {
+        grade,
+        courseTitle: `Grade ${grade} Vocabulary`,
+        lessonTitle: "Multi-lesson course", // Batch-level default
+      },
+      status: "created",
+    })
+    .returning();
+
+  if (!batch) {
+    console.error("❌ Failed to create batch");
+    process.exit(1);
+  }
+
+  console.log(`✅ Created batch: ${batch.batchId}`);
+  console.log(`📝 Lessons: ${Array.from(lessonTitles).join(", ").substring(0, 100)}...\n`);
+
+  // Create jobs with per-word lesson assignment
+  let created = 0;
+  let skipped = 0;
+
+  for (const [word, lessonTitle] of seen.entries()) {
+    try {
+      await db.insert(generationJob).values({
+        batchId: batch.batchId,
+        targetKey: word,
+        status: "queued",
+        inputJson: { lessonTitle }, // Store lesson assignment here
+      });
+      created++;
+    } catch (e) {
+      skipped++;
+    }
+  }
+
+  console.log(`✅ Created ${created} jobs (${skipped} duplicates skipped)\n`);
+  console.log(`🎯 Batch ID: ${batch.batchId}`);
+  console.log(`\n📋 Next steps:`);
+  console.log(`\n1. Generate content:`);
+  console.log(`   Option A - Background worker (recommended):`);
+  console.log(`     bun run api/services/genai/worker.ts`);
+  console.log(`   Option B - Manual two-pass:`);
+  console.log(`     PASS=1 bun run api/scripts/genai/run-jobs-two-pass.ts`);
+  console.log(`     PASS=2 bun run api/scripts/genai/run-jobs-two-pass.ts`);
+  console.log(`\n2. Export bundles (for backup):`);
+  console.log(`   bun run api/scripts/genai/export-bundles.ts ${batch.batchId}`);
+  console.log(`\n3. Check results:`);
+  console.log(`   GET /v1/gen/sprint/${batch.batchId}/status`);
+  console.log(`   GET /v1/gen/sprint/${batch.batchId}/results\n`);
+
+  process.exit(0);
+}
+
+void main();
+</file>
+
+<file path="api/scripts/genai/run-jobs-two-pass.ts">
+/* eslint-disable no-console, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call */
+/**
+ * Two-pass generation runner
+ * Pass 1: Text-only generation (fast, high concurrency)
+ * Pass 2: Media generation (slower, lower concurrency)
+ */
+import { and, eq } from "drizzle-orm";
+
+import { db } from "../../data/db";
+
+import { GEN_CONCURRENCY, STORAGE } from "server/config/constants";
+
+import { generationBatch, generationJob } from "../../data/genai";
+import { generateMediaOnly, generateTextOnly } from "../../services/genai/generator";
+import { WordBundleSchema } from "../../services/genai/schema";
+
+const mode = (process.env["PASS"] ?? "1") as "1" | "2";
+const POOL = mode === "1" ? GEN_CONCURRENCY.TEXT : GEN_CONCURRENCY.MEDIA_IMAGE;
+
+console.log(`🚀 Two-pass runner starting (PASS=${mode}, POOL=${POOL})...\n`);
+
+let processed = 0;
+let succeeded = 0;
+let failed = 0;
+
+async function claimJob(status: "queued" | "text_complete") {
+  const [job] = await db
+    .select()
+    .from(generationJob)
+    .where(eq(generationJob.status, status))
+    .orderBy(generationJob.createdTs)
+    .limit(1);
+  if (!job) return null;
+  const claimed = await db
+    .update(generationJob)
+    .set({ status: "running", startedTs: new Date(), heartbeatTs: new Date() })
+    .where(and(eq(generationJob.jobId, job.jobId), eq(generationJob.status, status)))
+    .returning();
+  return claimed[0] ?? null;
+}
+
+async function textWorker(id: number) {
+  for (;;) {
+    const job = await claimJob("queued");
+    if (!job) {
+      const [anyQueued] = await db
+        .select()
+        .from(generationJob)
+        .where(eq(generationJob.status, "queued"))
+        .limit(1);
+      if (!anyQueued) return;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      continue;
+    }
+
+    const [batch] = await db
+      .select()
+      .from(generationBatch)
+      .where(eq(generationBatch.batchId, job.batchId))
+      .limit(1);
+
+    const scope = (batch?.scopeJson ?? {}) as {
+      grade?: number;
+      courseTitle?: string;
+      lessonTitle?: string;
+    };
+
+    // Get per-job lesson title from inputJson (overrides batch-level)
+    const jobInput = (job.inputJson ?? {}) as { lessonTitle?: string };
+    const lessonTitle = jobInput.lessonTitle || scope.lessonTitle || "";
+
+    try {
+      console.log(`[T${id}] Generating text: ${job.targetKey} (Grade ${scope.grade})...`);
+      const { item } = await generateTextOnly({
+        batchId: job.batchId,
+        jobId: job.jobId,
+        headword: job.targetKey,
+        grade: scope.grade ?? 3,
+        courseTitle: scope.courseTitle ?? "",
+        lessonTitle,
+      });
+
+      await db
+        .update(generationJob)
+        .set({
+          status: "text_complete",
+          outputJsonRaw: { item },
+          updatedTs: new Date(),
+        })
+        .where(eq(generationJob.jobId, job.jobId));
+
+      succeeded++;
+      console.log(`  ✅ Text complete`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      await db
+        .update(generationJob)
+        .set({ status: "failed", errorText: msg, updatedTs: new Date() })
+        .where(eq(generationJob.jobId, job.jobId));
+      failed++;
+      console.log(`  ❌ Text failed: ${msg.substring(0, 150)}`);
+    }
+
+    processed++;
+    if (processed % 10 === 0) {
+      console.log(`\n📊 Pass 1 Progress: ${processed} (${succeeded} ✅, ${failed} ❌)\n`);
+    }
+  }
+}
+
+async function mediaWorker(id: number) {
+  for (;;) {
+    const job = await claimJob("text_complete");
+    if (!job) {
+      const [anyTextComplete] = await db
+        .select()
+        .from(generationJob)
+        .where(eq(generationJob.status, "text_complete"))
+        .limit(1);
+      if (!anyTextComplete) return;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      continue;
+    }
+
+    const [batch] = await db
+      .select()
+      .from(generationBatch)
+      .where(eq(generationBatch.batchId, job.batchId))
+      .limit(1);
+
+    const scope = (batch?.scopeJson ?? {}) as {
+      grade?: number;
+      courseTitle?: string;
+      lessonTitle?: string;
+    };
+
+    // Get per-job lesson title from inputJson
+    const jobInput = (job.inputJson ?? {}) as { lessonTitle?: string };
+    const lessonTitle = jobInput.lessonTitle || scope.lessonTitle || "";
+
+    try {
+      console.log(`[M${id}] Generating media: ${job.targetKey}...`);
+      const rawData = job.outputJsonRaw as { item: any } | null;
+      if (!rawData?.item) throw new Error("No text data in outputJsonRaw");
+
+      const media = await generateMediaOnly(rawData.item, job.batchId, job.jobId);
+
+      if (!media.pronunciations[0] || !media.pronunciations[1]) {
+        throw new Error("Failed to generate required pronunciations");
+      }
+
+      // Assemble full bundle
+      const baseKey = `${STORAGE.PUBLIC_MEDIA_PREFIX}/${job.batchId}/${job.jobId}`;
+      const bundle = WordBundleSchema.parse({
+        grade: scope.grade ?? 3,
+        courseTitle: scope.courseTitle ?? "",
+        lessonTitle,
+        orderHint: 1,
+        generatedAt: new Date().toISOString(),
+        item: rawData.item,
+        media: {
+          illustration: {
+            file: media.illustrationKey,
+            url: media.illustrationUrl,
+            mimeType: "image/png",
+            role: "illustration",
+          },
+          pronunciations: [
+            {
+              kind: "audio",
+              file: `${baseKey}/pronunciation-1.mp3`,
+              url: media.pronunciations[0].url,
+              voice: media.pronunciations[0].voice,
+              mimeType: "audio/mpeg",
+              role: "word_pronunciation",
+              orderNo: media.pronunciations[0].orderNo,
+            },
+            {
+              kind: "audio",
+              file: `${baseKey}/pronunciation-2.mp3`,
+              url: media.pronunciations[1].url,
+              voice: media.pronunciations[1].voice,
+              mimeType: "audio/mpeg",
+              role: "alt_pronunciation",
+              orderNo: media.pronunciations[1].orderNo,
+            },
+          ],
+          sentenceAudio: [],
+        },
+      });
+
+      // Upload bundle JSON to S3 for backup
+      const { putObject } = await import("../../services/genai/generator");
+      const bundleKey = `${baseKey}/bundle.json`;
+      const bundleJson = JSON.stringify(bundle, null, 2);
+      await putObject(bundleKey, "application/json", Buffer.from(bundleJson, "utf8"));
+
+      await db
+        .update(generationJob)
+        .set({
+          status: "succeeded",
+          outputJson: bundle,
+          updatedTs: new Date(),
+        })
+        .where(eq(generationJob.jobId, job.jobId));
+
+      succeeded++;
+      console.log(`  ✅ Media complete (bundle backed up to S3)`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      await db
+        .update(generationJob)
+        .set({ status: "failed", errorText: msg, updatedTs: new Date() })
+        .where(eq(generationJob.jobId, job.jobId));
+      failed++;
+      console.log(`  ❌ Media failed: ${msg.substring(0, 150)}`);
+    }
+
+    processed++;
+    if (processed % 10 === 0) {
+      console.log(`\n📊 Pass 2 Progress: ${processed} (${succeeded} ✅, ${failed} ❌)\n`);
+    }
+  }
+}
+
+async function main() {
+  if (mode === "1") {
+    // Pass 1: Text generation
+    const workers = Array.from({ length: Math.max(1, POOL) }, (_v, i) => textWorker(i + 1));
+    await Promise.all(workers);
+  } else {
+    // Pass 2: Media generation
+    const workers = Array.from({ length: Math.max(1, POOL) }, (_v, i) => mediaWorker(i + 1));
+    await Promise.all(workers);
+  }
+
+  console.log("\n" + "=".repeat(70));
+  console.log(`\n🎉 Pass ${mode} complete!`);
+  console.log(`   Total: ${processed}`);
+  console.log(`   ✅ Succeeded: ${succeeded}`);
+  console.log(`   ❌ Failed: ${failed}`);
+  if (processed > 0) {
+    console.log(`   Success rate: ${((succeeded / processed) * 100).toFixed(1)}%`);
+  }
+  process.exit(0);
+}
+
+void main();
+</file>
+
+<file path="api/index.ts">
+import { Hono } from "hono";
+import { logger } from "hono/logger";
+import { cors } from "hono/cors";
+import { requestId } from "hono/request-id";
+import { authMiddleware } from "./lib/auth";
+import { errorHandler, createErrorResponse, ErrorCode } from "./lib/errors";
+import { rateLimiter } from "./lib/rate-limiter";
+import routes from "./routes";
+import { serveStatic } from "hono/bun";
+import { SERVER } from "./config/constants";
+
+const app = new Hono();
+
+// Global middleware
+app.use("*", requestId()); // Add request ID to each request
+
+// Logger (disabled in test environment for cleaner output)
+if (process.env["NODE_ENV"] !== "test") {
+  app.use("*", logger());
+}
+
+// Rate limiting (disabled in test environment for performance)
+if (process.env["NODE_ENV"] !== "test") {
+  app.use("*", rateLimiter()); // Uses defaults from config/constants.ts
+}
+app.use(
+  "*",
+  cors({
+    origin: process.env["CORS_ORIGIN"] || SERVER.DEFAULT_CORS_ORIGIN,
+    credentials: true, // Allow cookies
+    allowMethods: [...SERVER.ALLOWED_METHODS],
+    allowHeaders: [...SERVER.ALLOWED_HEADERS],
+  })
+);
+
+// CSRF protection via Origin allowlist for cookie-auth state-changing requests
+app.use("*", async (c, next) => {
+  const method = c.req.method;
+  const enforce =
+    process.env["CSRF_ORIGIN_CHECK"] !== "false" && process.env["NODE_ENV"] !== "test";
+  if (enforce && (method === "POST" || method === "PATCH" || method === "DELETE")) {
+    const origin = c.req.header("origin") || "";
+    const allowed = process.env["CORS_ORIGIN"] || SERVER.DEFAULT_CORS_ORIGIN;
+    if (!origin || origin !== allowed) {
+      return c.json(createErrorResponse(ErrorCode.FORBIDDEN, "Invalid origin"), 403);
+    }
+  }
+  await next();
+  return undefined;
+});
+
+// Health check (no auth required)
+app.get("/health", (c) => {
+  return c.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// Health check alias for v1
+app.get("/v1/health", (c) => {
+  return c.json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// Root endpoint: JSON in dev, SPA in production (handled by wildcard below)
+if (process.env["NODE_ENV"] !== "production") {
+  app.get("/", (c) => {
+    return c.json({ message: "Playcademy Vocabulary API - MVP" });
+  });
+}
+
+// Serve static media (images/audio) BEFORE auth middleware
+// This must come before authMiddleware so static files don't require authentication
+// Server runs from api/ dir, files are in static/media/, URLs are /static/media/...
+app.get(
+  "/static/*",
+  serveStatic({
+    root: ".",
+  })
+);
+
+// Serve built client assets in production
+if (process.env["NODE_ENV"] === "production") {
+  app.get(
+    "/assets/*",
+    serveStatic({
+      root: "../client/dist",
+    })
+  );
+}
+
+// Auth middleware applies to all API routes
+app.use("*", authMiddleware);
+
+// API routes (v1)
+app.route("/v1", routes);
+
+// Serve SPA index.html for all other routes in production (must be last)
+if (process.env["NODE_ENV"] === "production") {
+  app.get(
+    "*",
+    serveStatic({
+      path: "../client/dist/index.html",
+    })
+  );
+}
+
+// Global error handler
+app.onError(errorHandler);
+
+// Railway and other cloud platforms use PORT, while local dev uses API_PORT
+const port = parseInt(
+  process.env["PORT"] || process.env["API_PORT"] || String(SERVER.DEFAULT_PORT)
+);
+
+// In Bun, exporting a default { fetch, port } auto-starts the server.
+// We only log environment details here to avoid double-starting the server.
+if (import.meta.main) {
+  console.log(`🚀 Starting Playcademy Vocabulary API on port ${port}...`);
+  console.log(`📍 Environment: ${process.env["NODE_ENV"] || "development"}`);
+  console.log(`🔗 CORS Origin: ${process.env["CORS_ORIGIN"] || SERVER.DEFAULT_CORS_ORIGIN}`);
+}
+
+export default {
+  port,
+  fetch: app.fetch,
+  // Ensure the server binds to all interfaces in containers (not just localhost)
+  hostname: "0.0.0.0",
+};
+</file>
+
+<file path="api/scripts/genai/ingest-from-s3.ts">
+/* eslint-disable no-console, @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+/**
+ * Ingest bundles directly from S3 (no local export needed!)
+ * Works on both local and Railway - just needs S3 credentials
+ * Auto-creates courses and lessons from bundle metadata
+ */
+import { GetObjectCommand, ListObjectsV2Command, S3Client } from "@aws-sdk/client-s3";
+import { sql } from "drizzle-orm";
+
+import { db } from "../../data/db";
+
+import { STORAGE } from "server/config/constants";
+
+import { word as wordTable } from "../../data";
+import { contentChangeItem, contentChangeSet } from "../../data/genai";
+import {
+  addWordToLesson,
+  createCourse,
+  createLesson,
+  getAllCourses,
+  getCourseById,
+} from "../../services/curriculum";
+import { commitChangeItem } from "../../services/genai/commit";
+import { newCommitToken } from "../../services/genai/generator";
+import { WordBundleSchema } from "../../services/genai/schema";
+
+const batchId = process.argv[2];
+
+if (!batchId) {
+  console.error("Usage: bun run api/scripts/genai/ingest-from-s3.ts <batchId|ALL>");
+  console.error("\nIngests bundles directly from S3 (works on both local & Railway)");
+  process.exit(1);
+}
+
+async function main() {
+  const BUCKET = process.env["BUCKET"];
+  const ENDPOINT = process.env["ENDPOINT"];
+  const ACCESS_KEY_ID = process.env["ACCESS_KEY_ID"];
+  const SECRET_ACCESS_KEY = process.env["SECRET_ACCESS_KEY"];
+
+  if (!BUCKET || !ENDPOINT || !ACCESS_KEY_ID || !SECRET_ACCESS_KEY) {
+    console.error("Missing S3 credentials (BUCKET, ENDPOINT, ACCESS_KEY_ID, SECRET_ACCESS_KEY)");
+    process.exit(1);
+  }
+
+  const s3 = new S3Client({
+    region: process.env["S3_REGION"] || STORAGE.S3_REGION,
+    endpoint: ENDPOINT,
+    forcePathStyle: true,
+    credentials: { accessKeyId: ACCESS_KEY_ID, secretAccessKey: SECRET_ACCESS_KEY },
+  });
+
+  console.log(`📥 Ingesting bundles from S3...`);
+  console.log(`🪣 Bucket: ${BUCKET}`);
+  console.log(`🎯 Batch: ${batchId}\n`);
+
+  // List all bundle.json files in S3 (with pagination)
+  const prefix =
+    batchId === "ALL"
+      ? `${STORAGE.PUBLIC_MEDIA_PREFIX}/`
+      : `${STORAGE.PUBLIC_MEDIA_PREFIX}/${batchId}/`;
+
+  console.log(`📡 Scanning S3 for bundles...`);
+
+  const bundleKeys: string[] = [];
+  let continuationToken: string | undefined;
+
+  do {
+    const listCommand = new ListObjectsV2Command({
+      Bucket: BUCKET,
+      Prefix: prefix,
+      ContinuationToken: continuationToken,
+    });
+
+    const listResult = await s3.send(listCommand);
+    const batchBundles = (listResult.Contents || [])
+      .map((obj) => obj.Key)
+      .filter((key): key is string => !!key && key.endsWith("/bundle.json"));
+
+    bundleKeys.push(...batchBundles);
+    continuationToken = listResult.NextContinuationToken;
+
+    console.log(`  Found ${batchBundles.length} more bundles...`);
+  } while (continuationToken);
+
+  if (bundleKeys.length === 0) {
+    console.log("⚠️  No bundle.json files found in S3");
+    process.exit(0);
+  }
+
+  console.log(`Found ${bundleKeys.length} bundles\n`);
+
+  console.log(`\n📚 Setting up course/lesson structure from bundles...\n`);
+
+  // Scan bundles to find all unique course/lesson combinations
+  const courseMap = new Map<string, { grade: number; courseId?: string; lessons: Set<string> }>();
+
+  for (const key of bundleKeys) {
+    try {
+      const getCommand = new GetObjectCommand({ Bucket: BUCKET, Key: key });
+      const result = await s3.send(getCommand);
+      const bodyText = await result.Body?.transformToString();
+      if (!bodyText) continue;
+
+      const parsed = JSON.parse(bodyText);
+      const bundle = WordBundleSchema.parse(parsed);
+
+      const courseTitle = bundle.courseTitle || "";
+      const lessonTitle = bundle.lessonTitle || "";
+
+      if (!courseTitle || !lessonTitle) continue;
+
+      if (!courseMap.has(courseTitle)) {
+        courseMap.set(courseTitle, { grade: bundle.grade, lessons: new Set() });
+      }
+      courseMap.get(courseTitle)!.lessons.add(lessonTitle);
+    } catch (e) {
+      // Skip bundles we can't parse during structure scan
+    }
+  }
+
+  // Create courses and all their lessons
+  const lessonMap = new Map<string, string>(); // "courseTitle|lessonTitle" -> lessonId
+
+  for (const [courseTitle, data] of courseMap.entries()) {
+    // Find or create course
+    const courses = await getAllCourses();
+    let course = courses.find((c) => c.title === courseTitle);
+
+    if (!course) {
+      console.log(`📚 Creating course: ${courseTitle}`);
+      const newCourse = await createCourse({
+        grade: data.grade,
+        title: courseTitle,
+        status: "active",
+        defaultNewWordsPerSession: 3,
+      });
+      course = { ...newCourse, lessonCount: 0 };
+    }
+
+    data.courseId = course.courseId;
+
+    // Create all lessons for this course
+    const courseWithLessons = await getCourseById(course.courseId);
+
+    for (const lessonTitle of data.lessons) {
+      let lesson = courseWithLessons?.lessons?.find((l) => l.title === lessonTitle);
+
+      if (!lesson) {
+        console.log(`  📝 Creating lesson: ${lessonTitle}`);
+        const newLesson = await createLesson({
+          courseId: course.courseId,
+          title: lessonTitle,
+          targetNewPerSession: 3,
+        });
+        lesson = newLesson;
+      }
+
+      if (lesson) {
+        lessonMap.set(`${courseTitle}|${lessonTitle}`, lesson.lessonId);
+      }
+    }
+  }
+
+  console.log(`\n✅ Created/found ${lessonMap.size} lessons across ${courseMap.size} course(s)\n`);
+
+  let ingested = 0;
+  let failed = 0;
+  let skipped = 0;
+
+  const CONCURRENCY = Number(process.env["INGEST_CONCURRENCY"] || 8);
+
+  async function processKey(key: string) {
+    const t0 = Date.now();
+    try {
+      // Download bundle JSON
+      const getCommand = new GetObjectCommand({ Bucket: BUCKET, Key: key });
+      const result = await s3.send(getCommand);
+      const bodyText = await result.Body?.transformToString();
+
+      if (!bodyText) {
+        throw new Error("Empty bundle");
+      }
+
+      const parsed = JSON.parse(bodyText);
+      const bundle = WordBundleSchema.parse(parsed);
+
+      // Create changeset and commit
+      const [changeSet] = await db
+        .insert(contentChangeSet)
+        .values({ status: "approved" })
+        .returning();
+
+      if (!changeSet) throw new Error("Failed to create changeset");
+
+      const [changeItem] = await db
+        .insert(contentChangeItem)
+        .values({
+          changeSetId: changeSet.changeSetId,
+          jobId: null, // No generation job for manual S3 imports
+          entityType: "word",
+          payloadJson: bundle,
+          status: "pending",
+        })
+        .returning();
+
+      if (!changeItem) throw new Error("Failed to create change item");
+
+      const token = newCommitToken();
+      await commitChangeItem(changeItem.changeItemId, token);
+
+      // Attach word to its lesson
+      const courseTitle = bundle.courseTitle || "";
+      const lessonTitle = bundle.lessonTitle || "";
+      const lessonKey = `${courseTitle}|${lessonTitle}`;
+
+      if (lessonMap.has(lessonKey)) {
+        const lessonId = lessonMap.get(lessonKey);
+
+        // Find the word that was just created
+        const [createdWord] = await db
+          .select()
+          .from(wordTable)
+          .where(sql`lower(${wordTable.headword}) = lower(${bundle.item.headword})`)
+          .limit(1);
+
+        if (createdWord && lessonId) {
+          try {
+            await addWordToLesson(lessonId, {
+              wordId: createdWord.wordId,
+              orderNo: bundle.orderHint,
+            });
+          } catch (e) {
+            // Skip if already attached
+          }
+        }
+      }
+
+      const dt = Date.now() - t0;
+      if (dt > 5000) {
+        console.log(`  ✅ ${bundle.item.headword} (${dt} ms)`);
+      } else {
+        console.log(`  ✅ ${bundle.item.headword}`);
+      }
+      ingested++;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      // Skip duplicates gracefully
+      if (msg.includes("Word exists:")) {
+        const headword = msg.split("Word exists: ")[1];
+        console.log(`  ⏭️  ${headword} (already exists, skipped)`);
+        skipped++;
+      } else {
+        console.error(`  ❌ ${key.split("/").pop()}: ${msg.substring(0, 100)}`);
+        failed++;
+      }
+    }
+  }
+
+  // Process with limited concurrency
+  let idx = 0;
+  const workers = Array.from({ length: CONCURRENCY }, async () => {
+    while (idx < bundleKeys.length) {
+      const myIdx = idx++;
+      const key = bundleKeys[myIdx];
+      if (!key) break;
+      await processKey(key);
+    }
+  });
+  await Promise.all(workers);
+
+  console.log(`\n📊 Summary:`);
+  console.log(`   ✅ Ingested: ${ingested}`);
+  console.log(`   ⏭️  Skipped (duplicates): ${skipped}`);
+  console.log(`   ❌ Failed: ${failed}`);
+
+  process.exit(0);
+}
+
+void main();
+</file>
+
+</files>

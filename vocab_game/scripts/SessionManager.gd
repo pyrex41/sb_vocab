@@ -11,6 +11,8 @@ signal loading_ended()
 signal api_error(message)
 
 var current_session_id: String = ""
+var current_item_id: String = ""  # Current activity item ID from backend
+var current_activity_start_time: int = 0  # Timestamp when activity was shown
 var activities: Array = []
 var current_activity_index: int = 0
 var session_active: bool = false
@@ -105,6 +107,13 @@ func _load_next_activity():
 		_end_session()
 		return
 
+	# Store the current item ID for submission
+	if response.has("itemId"):
+		current_item_id = response.itemId
+
+	# Record activity start time for latency calculation
+	current_activity_start_time = Time.get_ticks_msec()
+
 	# Emit activity changed with the new activity data
 	print("Loaded activity: ", response.activityType)
 	activity_changed.emit(response, current_activity_index, -1)  # Total count not available
@@ -128,13 +137,16 @@ func submit_answer(answer: String):
 
 	loading_started.emit()
 
+	# Calculate latency in milliseconds
+	var latency_ms = Time.get_ticks_msec() - current_activity_start_time
+
 	var response = await PlaycademySdk.backend.request(
 		"POST",
-		"/session/attempt",
+		"/session/%s/attempt" % current_session_id,
 		{
-			"session_id": current_session_id,
-			"activity_index": current_activity_index,
-			"answer": answer
+			"itemId": current_item_id,
+			"answer": answer,
+			"latencyMs": latency_ms
 		}
 	)
 
@@ -142,7 +154,8 @@ func submit_answer(answer: String):
 
 	# Check for API errors
 	if response.has("error") and response.error:
-		_handle_api_error(response.error)
+		var error_data = response.error if typeof(response.error) == TYPE_DICTIONARY else {"message": str(response.error)}
+		_handle_api_error(error_data)
 		return
 
 	# Validate response
@@ -152,7 +165,15 @@ func submit_answer(answer: String):
 
 	# Success - clear failed operation
 	last_failed_operation.clear()
-	attempt_result.emit(response.correct, response.feedback)
+
+	# Provide default feedback if backend doesn't provide it
+	var feedback = ""
+	if response.has("feedback"):
+		feedback = response.feedback
+	else:
+		feedback = "Great job!" if response.correct else "Not quite right. Try again!"
+
+	attempt_result.emit(response.correct, feedback)
 
 	# Wait a moment before advancing to next activity
 	await get_tree().create_timer(1.5).timeout
@@ -286,9 +307,7 @@ func _validate_attempt_response(response: Dictionary) -> bool:
 	if not response.has("correct"):
 		push_error("Response missing 'correct' field")
 		return false
-	if not response.has("feedback"):
-		push_error("Response missing 'feedback' field")
-		return false
+	# feedback is optional - backend may not always provide it
 	return true
 
 func _validate_progress_response(response: Dictionary) -> bool:

@@ -18,6 +18,7 @@ var current_activity_index: int = 0
 var session_active: bool = false
 var last_failed_operation: Dictionary = {}  # Store failed operation for retry
 var course_id: String = ""  # Will store the first available course ID
+var last_session_summary: Dictionary = {}  # Store last session summary for results screen
 
 func start_new_session(grade: String = "grade3"):
 	# Store operation for retry in case of failure
@@ -182,8 +183,8 @@ func submit_answer(answer: String):
 func next_activity():
 	if not session_active:
 		return
-	
-	current_activity_index += 1
+
+	# Don't increment here - _load_next_activity() handles it
 	_load_current_activity()
 
 func _end_session():
@@ -221,12 +222,17 @@ func _end_session():
 		current_session_id = ""
 		activities = []
 		current_activity_index = 0
-		# Emit a basic session ended signal so UI can transition
-		session_ended.emit({"error": true, "total_activities": 0, "correct_count": 0})
+		# Store empty summary and emit session ended signal so UI can transition
+		last_session_summary = {"error": true, "totalAttempts": 0, "correctAttempts": 0}
+		session_ended.emit(last_session_summary)
 		return
 
 	# Success - clear failed operation
 	last_failed_operation.clear()
+
+	# Store session summary for results screen
+	last_session_summary = response
+
 	session_ended.emit(response)
 
 	current_session_id = ""

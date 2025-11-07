@@ -14,17 +14,34 @@ func _ready():
 	_show_results()
 
 func _show_results():
-	var progress = SessionManager.get_progress_data()
-	
-	title_label.text = "Session Complete!"
-	words_label.text = "Total Words Learned: %d" % progress.words_learned
-	
-	if progress.accuracy >= 80:
-		title_label.text = "Excellent Work!"
-	elif progress.accuracy >= 60:
-		title_label.text = "Good Job!"
+	var summary = SessionManager.last_session_summary
+
+	# Handle missing or error summary
+	if summary.is_empty() or summary.has("error"):
+		title_label.text = "Session Complete!"
+		activities_label.text = "Thanks for playing!"
+		words_label.text = "Keep up the great work!"
+		return
+
+	# Display session statistics
+	var total = summary.get("totalAttempts", 0)
+	var correct = summary.get("correctAttempts", 0)
+	var accuracy = (float(correct) / float(total) * 100.0) if total > 0 else 0.0
+
+	activities_label.text = "Activities Completed: %d" % total
+	words_label.text = "Correct: %d / %d (%.0f%%)" % [correct, total, accuracy]
+
+	# Encouraging title based on performance
+	if accuracy >= 90:
+		title_label.text = "🌟 Outstanding! 🌟"
+	elif accuracy >= 80:
+		title_label.text = "⭐ Excellent Work! ⭐"
+	elif accuracy >= 70:
+		title_label.text = "✨ Great Job! ✨"
+	elif accuracy >= 60:
+		title_label.text = "👍 Good Effort! 👍"
 	else:
-		title_label.text = "Keep Practicing!"
+		title_label.text = "Keep Practicing! 💪"
 
 func _on_continue_pressed():
 	get_tree().change_scene_to_file("res://scenes/GameSession.tscn")

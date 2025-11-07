@@ -8,7 +8,8 @@ signal attempt_result(correct, feedback)
 signal session_ended(summary)
 signal loading_started()
 signal loading_ended()
-signal api_error(message)
+signal api_error(message)  # Legacy signal - kept for backwards compatibility
+signal error_occurred(error_type: String)  # New signal with classified error types
 
 var current_session_id: String = ""
 var current_item_id: String = ""  # Current activity item ID from backend
@@ -348,24 +349,21 @@ func _get_empty_progress() -> Dictionary:
 		"sessions_completed": 0
 	}
 
-func _handle_api_error(error: Dictionary):
-	var error_message = "Oops! Something went wrong."
+func _handle_api_error(error: Variant):
+	## Handle API errors with kid-friendly classification
+	## Uses ErrorMessages to classify errors into user-friendly types
 
-	if error.has("code"):
-		match error.code:
-			"NETWORK_ERROR":
-				error_message = "Can't connect to the server. Check your internet!"
-			"TIMEOUT":
-				error_message = "The server is taking too long. Try again!"
-			"AUTH_ERROR":
-				error_message = "Please log in again."
-			_:
-				error_message = error.message if error.has("message") else error_message
-	elif error.has("message"):
-		error_message = error.message
+	# Classify the error using ErrorMessages utility
+	var error_type = ErrorMessages.classify_error(error)
 
-	# Emit error signal that UI can handle
-	api_error.emit(error_message)
+	# Get kid-friendly message for logging
+	var error_data = ErrorMessages.get_message(error_type)
+
+	# Emit new classified error signal
+	error_occurred.emit(error_type)
+
+	# Also emit legacy signal for backwards compatibility
+	api_error.emit("%s %s" % [error_data.icon, error_data.title])
 
 	# Log for debugging
-	push_error("API Error: " + str(error))
+	push_error("API Error [%s]: %s" % [error_type, str(error)])

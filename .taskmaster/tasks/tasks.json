@@ -1253,5 +1253,470 @@
       "updated": "2025-11-07T02:11:02.431Z",
       "description": "Tasks for integrate context"
     }
+  },
+  "p5-incorrect-flow": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Add Missed Words Storage to SessionManager",
+        "description": "Extend SessionManager.gd to include storage for missed words, including new signals, state variables, and methods for storing and retrieving missed words.",
+        "details": "Add new signals: incorrect_answer_submitted, review_mode_started, review_word_answered. Add state variables: missed_words array, review_mode bool, review_index int. Implement methods: store_missed_word to add word data with timestamp, start_review_mode to activate review for up to 5 words, get_review_progress to return improvement stats. Ensure compatibility with existing SessionManager structure.",
+        "testStrategy": "Unit tests: Verify store_missed_word adds to array, start_review_mode activates correctly, get_review_progress returns accurate stats. Integration tests: Simulate incorrect answers and check storage.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "Modify GameSession for Incorrect Answer Handling",
+        "description": "Update GameSession.gd to handle incorrect answers by showing correction feedback, storing missed words, and proceeding to next activity.",
+        "details": "Modify _on_attempt_result to call _show_incorrect_feedback_with_learning for incorrect answers. Implement _show_incorrect_feedback_with_learning: play incorrect sound, display correction panel with correct answer, definition/context, encouraging message, wait 2.5 seconds, store word in SessionManager, then continue. Use existing AudioManager and ensure graceful fallback if definition is missing.",
+        "testStrategy": "Unit tests: Mock incorrect attempt and verify feedback display and storage. Integration tests: Full flow from incorrect answer to next activity, checking timer and storage.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 3,
+        "title": "Create Correction Panel UI Component",
+        "description": "Design and implement the Correction Panel UI that extends the existing FeedbackPanel to show incorrect feedback.",
+        "details": "Create a new UI component based on existing FeedbackPanel. Include layout: 'Not quite!' message, correct answer in a box, definition/context if available, encouraging message. Use gentle yellow/orange color scheme. Implement slide-in animation (0.3s), pulse on correct answer, fade out after timer. Ensure it fits the game's theme and is responsive.",
+        "testStrategy": "UI tests: Verify panel displays correctly with and without definition. Animation tests: Check slide-in, pulse, fade timings. User testing: Confirm readability and engagement for 3rd-5th graders.",
+        "priority": "medium",
+        "dependencies": [
+          2
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "Implement Session-End Review Logic",
+        "description": "Add logic to GameSession.gd to trigger review mode at session end if there are missed words.",
+        "details": "Modify _on_session_ended to check for missed words via SessionManager.has_missed_words(). If present, call _start_review_mode(); else, navigate to results. Implement _start_review_mode: show transition UI, present missed words one by one, track answers, calculate improvement. Limit review to max 5 words. Update results screen to include review stats.",
+        "testStrategy": "Integration tests: Complete session with missed words, verify review mode starts, track answers, and results show stats. Edge case tests: No missed words skips review, more than 5 caps at 5.",
+        "priority": "high",
+        "dependencies": [
+          1,
+          2
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "Create Review Mode UI and Transitions",
+        "description": "Develop UI components for review mode transition, progress indicator, and word re-presentation.",
+        "details": "Create Review Mode Transition panel: 'Great work! Let's review tricky words!' with Continue button. Add Review Progress Indicator: dots or bar showing progress (e.g., ●●●○○). Implement fade-to-black transition (0.5s), slide-in for review cards (0.4s). Ensure smooth flow from session end to review to results. Randomize encouraging messages for variety.",
+        "testStrategy": "UI tests: Verify transition panels and progress indicator display correctly. Animation tests: Check fade and slide timings. Integration tests: Full review flow, ensuring progress updates and transitions work.",
+        "priority": "medium",
+        "dependencies": [
+          4
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 6,
+        "title": "Polish Animations, Effects, and Testing",
+        "description": "Add final animations, varied messages, and conduct comprehensive testing for the incorrect answer flow.",
+        "details": "Enhance Correction Panel with animations: slide-in, pulse, fade. Add randomized encouraging messages. Implement 'Continue' button for fast readers (after 1.5s min). Conduct unit, integration, and user testing. Test edge cases: no missed words, many missed words, missing definitions, quitting during review. Ensure graceful degradation.",
+        "testStrategy": "Unit tests: All new methods and states. Integration tests: End-to-end flow including review. User testing: With 3rd-5th graders for engagement, comprehension, and satisfaction metrics. Validate success criteria: correction display, 2.5s timer, storage, review mode, results stats.",
+        "priority": "medium",
+        "dependencies": [
+          3,
+          5
+        ],
+        "status": "pending",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2025-11-07T21:33:04.980Z",
+      "updated": "2025-11-07T21:33:04.980Z",
+      "description": "Tasks for p5-incorrect-flow context"
+    }
+  },
+  "p5-juice": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Create EffectsManager Singleton",
+        "description": "Set up the EffectsManager.gd as an AutoLoad singleton with basic structure for managing visual effects.",
+        "details": "Create a new script EffectsManager.gd extending Node. Include variables for camera, shake_amount, shake_decay, flash_overlay, active_flash_tween, particle_pool, and active_particles. Implement _ready() to call _setup_camera(), _setup_flash_overlay(), and _init_particle_pool(). Configure it as an AutoLoad in project settings. Use Godot 4.x Tween system for animations.",
+        "testStrategy": "Verify the singleton loads correctly by checking if EffectsManager is accessible globally. Test that camera and overlay are set up without errors.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "Implement Screen Shake System",
+        "description": "Add screen shake functionality to provide impact feedback for actions like correct answers.",
+        "details": "In EffectsManager.gd, implement screen_shake(intensity: float, duration: float) to set shake_amount and decay. Update _process(delta) to apply random offsets to camera.offset based on shake_amount, decaying over time. Ensure intensity ranges from 0.1 to 1.0 and duration from 0.1s to 0.5s. Add accessibility note for future disable option.",
+        "testStrategy": "Call screen_shake with various intensities and durations. Assert camera offset changes during shake and resets to zero after. Measure FPS to ensure no drops below 55.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 3,
+        "title": "Implement Color Flash Overlay",
+        "description": "Add color flash overlay for reinforcing game states like correct/incorrect answers.",
+        "details": "In EffectsManager.gd, implement color_flash(color: Color, duration: float) using Tween to animate flash_overlay's modulate property. Set up flash_overlay as a ColorRect in _setup_flash_overlay(). Use for green on correct, red on incorrect, black on transitions. Ensure semi-transparent colors for subtlety.",
+        "testStrategy": "Trigger color_flash with different colors and durations. Visually inspect overlay appearance and fade. Record video to confirm timing and no visual glitches.",
+        "priority": "medium",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "Create Particle Presets and Pooling",
+        "description": "Develop ParticlePresets.gd and implement object pooling for efficient particle management.",
+        "details": "Create ParticlePresets.gd as a static resource with dictionaries for CELEBRATION, CONFETTI, SPARKLE, ERROR_DUST. In EffectsManager.gd, implement _init_particle_pool() to pre-allocate MAX_PARTICLES CPUParticles2D instances, set one_shot=true, and add as children. Implement get_particle_from_pool() and return_particle_to_pool() for reuse.",
+        "testStrategy": "Stress test by spawning max particles and checking pool usage. Assert no new allocations during bursts. Monitor FPS during particle emissions.",
+        "priority": "medium",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "Implement Particle Burst Method",
+        "description": "Add particle_burst() to spawn effects at positions using presets.",
+        "details": "In EffectsManager.gd, implement particle_burst(position: Vector2, preset: Dictionary) to get a particle from pool, configure it with preset values (count, colors, shapes via texture, lifetime, etc.), set position, and emit. Use CPUParticles2D properties for spread, velocity, gravity. Add culling for off-screen positions. Connect finished signal to return to pool.",
+        "testStrategy": "Spawn bursts with different presets at various positions. Verify particle behavior matches preset (e.g., CELEBRATION rises up). Test culling by spawning off-screen and confirming no emission.",
+        "priority": "medium",
+        "dependencies": [
+          4
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 6,
+        "title": "Create BaseButton Script with Juice",
+        "description": "Develop a BaseButton.gd script to add hover, press, and release animations to buttons.",
+        "details": "Create BaseButton.gd extending Button. In _on_mouse_entered(), tween scale to 1.05 and call EffectsManager.particle_burst with SPARKLE. In _on_pressed(), tween scale to 0.95 then 1.05, and screen_shake(0.1, 0.1). In _on_released(), tween back to 1.0. Apply to all buttons in scenes like MainMenu and GameSession.",
+        "testStrategy": "Attach to a test button and simulate hover/press/release. Assert scale changes and effects trigger. Gather user feedback on feel from target age group.",
+        "priority": "medium",
+        "dependencies": [
+          1,
+          2,
+          5
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 7,
+        "title": "Create TransitionManager Singleton",
+        "description": "Set up TransitionManager.gd for smooth scene and UI transitions.",
+        "details": "Create TransitionManager.gd extending Node as AutoLoad. Implement crossfade(from: Control, to: Control, duration), slide_in(node: Control, from_direction: Vector2, duration), scale_pop_in(node: Control, duration), and fade_to_black(callback: Callable, duration) using Tweens. Use for activity changes and feedback panels.",
+        "testStrategy": "Test each method on sample UI elements. Assert smooth animations without jarring. Measure transition times and visual continuity.",
+        "priority": "medium",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 8,
+        "title": "Integrate Effects into Game Flows",
+        "description": "Add effects to GameSession for correct/incorrect answers, activity completion, and results screen.",
+        "details": "In GameSession.gd, on correct answer: screen_shake(0.3, 0.25), color_flash green, particle_burst CELEBRATION. On incorrect: gentle shake, red flash, ERROR_DUST. On activity complete: CONFETTI rain. Use TransitionManager for panels. Ensure 60fps and no spam via cooldowns.",
+        "testStrategy": "Play through game flows and record videos. A/B test with/without effects for engagement metrics. Assert success criteria: shake feels impactful, particles are clear, transitions smooth, FPS maintained.",
+        "priority": "high",
+        "dependencies": [
+          2,
+          3,
+          5,
+          6,
+          7
+        ],
+        "status": "pending",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2025-11-07T21:33:24.198Z",
+      "updated": "2025-11-07T21:33:24.198Z",
+      "description": "Tasks for p5-juice context"
+    }
+  },
+  "p5-sound-polish": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Source and Prepare Audio Assets",
+        "description": "Acquire professional sound effects and background music from free libraries or generate using tools, ensuring they meet kid-friendly specifications.",
+        "details": "Use sites like freesound.org, OpenGameArt.org, Mixkit.co, or ZapSplat.com to download CC0 assets for button_click.wav, correct.wav, incorrect.wav, activity_complete.wav, session_start.wav, session_complete.wav, button_hover.wav, transition_whoosh.wav, error_dialog.wav, help_open.wav, word_appear.wav, typing.wav, gameplay_loop.ogg, and results_fanfare.ogg. Normalize volumes: SFX to -6 dB peak, music to -12 dB peak. Use Bfxr for UI sounds if needed. Save in audio/sfx/ and audio/music/ directories with specified naming convention. Ensure WAV for SFX (44.1kHz, 16-bit, mono) and OGG for music.",
+        "testStrategy": "Play each asset in an audio editor to verify duration, style, and volume levels. Test for clipping and ensure seamless looping for music.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "Enhance AudioManager with Music System",
+        "description": "Extend the AudioManager to support background music playback with fade-in/out functionality.",
+        "details": "Add the provided GDScript code to AudioManager.gd: setup music_player, load_music function, play_music, stop_music, and set_music_enabled. Include constants for MUSIC_GAMEPLAY and MUSIC_RESULTS. Ensure music is on a separate 'Music' bus at -10 dB.",
+        "testStrategy": "Load the scene and call play_music functions; verify fade-in/out works, music loops seamlessly, and mute toggle affects music.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 3,
+        "title": "Integrate Audio into Game Scenes",
+        "description": "Hook up sound effects and music playback in relevant game scenes like GameSession, ResultsScreen, and MainMenu.",
+        "details": "In GameSession.gd, call AudioManager.play_music(MUSIC_GAMEPLAY, 1.5) on ready and stop_music on session end. In ResultsScreen.gd, play MUSIC_RESULTS on ready. In MainMenu.gd, stop_music on ready. Add calls for new SFX like button_hover on mouse enter, word_appear on new questions, etc., using existing AudioManager hooks.",
+        "testStrategy": "Navigate through the game, trigger events (button presses, session start/end), and confirm correct sounds play at appropriate times without delay or clipping.",
+        "priority": "high",
+        "dependencies": [
+          2
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "Configure Audio Bus Settings",
+        "description": "Set up audio buses in Godot project settings for proper mixing of SFX and music.",
+        "details": "In Godot Project Settings → Audio, create 'Master' bus at 0 dB, with sub-buses 'SFX' at 0 dB and 'Music' at -10 dB. Assign AudioManager's music_player to 'Music' bus and ensure SFX are on 'SFX' bus.",
+        "testStrategy": "Play SFX and music simultaneously; adjust volumes and verify balanced mixing without overload.",
+        "priority": "medium",
+        "dependencies": [
+          2
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "Apply Kid-Friendly Theme to All Scenes",
+        "description": "Manually apply the existing kid_friendly_theme.tres to all 9 specified scenes in the Godot editor.",
+        "details": "For each scene (MainMenu.tscn, GameSession.tscn, etc.), open in editor, select root Control node, set Theme to res://themes/kid_friendly_theme.tres in Inspector, review and remove redundant theme_override_* properties, then save. Ensure theme includes button styles, label styles, and panel styles.",
+        "testStrategy": "Load each scene and visually inspect for consistent application of colors, fonts, and styles; check for regressions in layout.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 6,
+        "title": "Add Depth and Shadows to UI Elements",
+        "description": "Implement shadows and rounded corners on panels and cards for visual depth.",
+        "details": "Update the theme or individual panels with StyleBoxFlat: set bg_color to white, shadow_color to Color(0,0,0,0.2), shadow_size 8, shadow_offset Vector2(0,4), corner_radius 12. Apply to all panels across scenes to make them 'float' above background.",
+        "testStrategy": "Render scenes and verify shadows appear correctly, enhancing depth without obscuring content; test on different resolutions.",
+        "priority": "medium",
+        "dependencies": [
+          5
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 7,
+        "title": "Establish Typography Hierarchy",
+        "description": "Standardize font sizes and weights for titles, subtitles, body text, hints, and buttons.",
+        "details": "Update kid_friendly_theme.tres with font size variations: H1 48px bold, H2 32px semi-bold, Body 24px regular, Hint 18px italic, Button 24px bold. Apply via theme overrides in scenes, ensuring readability and hierarchy.",
+        "testStrategy": "Display text elements and measure font sizes; test readability on various screen resolutions and ensure no overlap or cut-off.",
+        "priority": "medium",
+        "dependencies": [
+          5
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 8,
+        "title": "Standardize Spacing, Alignment, Colors, and Polish",
+        "description": "Ensure consistent margins, padding, alignment, color usage, button states, and loading indicators across all scenes.",
+        "details": "Use MarginContainer for 20px margins/40px large, VBoxContainer/HBoxContainer with 10-20px separation. Verify color palette: primary blue for buttons, success green, etc. Ensure button states (hover scale 1.05x, pressed 0.95x). Replace 'Loading...' with animated spinner and messages like 'Gathering words... 📚'. Align to 8px grid.",
+        "testStrategy": "Audit all scenes for spacing consistency, color adherence, and button interactions; perform accessibility checks for contrast ratios (WCAG AA); test loading states and responsive design on different resolutions.",
+        "priority": "medium",
+        "dependencies": [
+          5,
+          6,
+          7
+        ],
+        "status": "pending",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2025-11-07T21:33:43.355Z",
+      "updated": "2025-11-07T21:33:43.355Z",
+      "description": "Tasks for p5-sound-polish context"
+    }
+  },
+  "p5-activities": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Implement Activity Title Cards and Icons",
+        "description": "Add title cards that appear before each activity with custom animations and consistent iconography for each activity type displayed in the top-right.",
+        "details": "Create a reusable function to show title cards with fade-in, hold, and zoom-out fade effects using Tween. Implement icon display logic for each activity type (Flashcard: 📇, Multiple Choice: 🤔, Spelling: ✍️, Fill Blank: 📝, Synonym/Antonym: 🔄) in the top-right corner during activities. Use GDScript with CanvasLayer for overlays and Label for text. Ensure animations are skippable and consider reduced motion settings.",
+        "testStrategy": "Manually test title card appearance and exit for all 5 activity types, verifying icons are visible and animations run smoothly at 60fps. Check accessibility by ensuring animations can be skipped with input.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "Enhance Flashcard with Custom Animations",
+        "description": "Implement entrance animation with fly-in and rotation, 3D card flip effect, and particle effects for flip and correct answers.",
+        "details": "Use Tween for entrance: position and rotation tween from off-screen. For flip: scale front to 0, swap to back, scale back to 1. Add sparkle particles on flip and celebration burst on correct. Integrate with existing flashcard script in /vocab_game/scripts/activities/flashcard.gd. Reuse tween objects for performance.",
+        "testStrategy": "Test flip animation smoothness, particle effects visibility, and ensure no performance drops. Verify entrance animation triggers correctly and particles appear at card edges/center.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 3,
+        "title": "Enhance Multiple Choice with Sequential Reveals and Feedback",
+        "description": "Add sequential appearance of options with stagger, selection feedback with scaling and dimming, and incorrect shake animation.",
+        "details": "For options: modulate alpha and position tween with stagger delay. On selection: scale up/down selected, dim others. On incorrect: shake selected, fade wrong options. Play 'pop' sound on appear and integrate with AudioManager. Use Tween for all animations.",
+        "testStrategy": "Test sequential reveal timing and feedback on correct/incorrect selections. Ensure options appear without overlap and shake/fade effects are noticeable. Check audio plays correctly.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "Enhance Spelling with Letter-by-Letter Effects",
+        "description": "Implement word appearance letter-by-letter with bounce, typing feedback with pulse, and correct submission celebration.",
+        "details": "For word show: append letters with scale bounce and type sound. Fade out after pause. On typing: pulse input field scale. On correct: reveal green word letter-by-letter with particle bursts. Use Label for text display and EffectsManager for particles.",
+        "testStrategy": "Test letter-by-letter reveal speed and bounce effect. Verify typing pulse and correct celebration animations. Ensure particles burst at correct positions and performance remains at 60fps.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "Enhance Fill in the Blank with Word Slot Animations",
+        "description": "Add sentence build-in with pulsing blank, and word insertion zoom animation.",
+        "details": "For sentence: append parts with delays, show pulsing blank indicator. On correct: create word label, zoom scale and position to blank, hide indicator. Use Tween for pulsing and zoom with EASE_OUT and TRANS_BACK.",
+        "testStrategy": "Test sentence build-in timing and blank pulsing. Verify word insertion zooms smoothly into place without obscuring text. Check animations maintain readability and fps.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 6,
+        "title": "Enhance Synonym/Antonym with Relationship Visualizations",
+        "description": "Implement word pair entrance from sides and animated relationship arrows for synonym/antonym selection.",
+        "details": "For entrance: tween positions from off-screen. On selection: draw Line2D arrow growing for synonym (green), or X/arrows for antonym. Use tween_method for arrow animation. Integrate with button selections.",
+        "testStrategy": "Test word pair entrance and arrow drawing on selections. Ensure arrows animate correctly and don't overlap text. Verify visual feedback is clear for relationships.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2025-11-07T21:34:19.032Z",
+      "updated": "2025-11-07T21:34:19.032Z",
+      "description": "Tasks for p5-activities context"
+    }
+  },
+  "p5-overview": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Implement EffectsManager and TransitionManager Systems",
+        "description": "Create AutoLoad singletons for managing particle effects, screen shakes, color flashes, and smooth transitions to enhance game feel.",
+        "details": "In Godot, create two AutoLoad singletons: EffectsManager.gd and TransitionManager.gd. For EffectsManager, implement methods like screen_shake(intensity: float, duration: float) using Tween for camera shake, color_flash(color: Color, duration: float) for overlay flashes, and spawn_particle_burst(position: Vector2, count: int, config: Dictionary) using CPUParticles2D with object pooling to avoid performance issues. For TransitionManager, implement fade_to_black(duration: float) with a CanvasLayer overlay, crossfade_scenes(from: Node, to: Node, duration: float) for scene changes, and slide_in(node: Control, direction: Vector2, duration: float) for UI elements. Create ParticleConfig resource class with exported properties for customization. Ensure compatibility with Godot 4.x, using the latest Tween API for smooth animations. Integrate with existing SessionManager and GameSession for feedback signals.",
+        "testStrategy": "Unit test each method in EffectsManager and TransitionManager by calling them in a test scene and verifying visual effects occur correctly. Performance test by spawning multiple particle bursts and monitoring FPS to ensure 60fps is maintained. Manual QA to check screen shake and transitions feel smooth on target devices.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "Implement Incorrect Answer Flow with Pedagogy",
+        "description": "Develop the pedagogical approach for handling incorrect answers, including second chances, learning moments, and spaced repetition to improve user experience.",
+        "details": "Modify SessionManager to add 'incorrect_answer_attempt' signal and 'retry_word_later(word_data)' method, tracking missed words for end-of-session review. In GameSession, integrate EffectsManager for feedback on incorrect answers, such as subtle screen shake or color flash. Implement a flow where incorrect answers trigger a second chance prompt, display learning hints, and queue words for later retry using spaced repetition logic. Use TransitionManager for smooth transitions during retries. Ensure the flow is kid-friendly, encouraging, and pedagogically sound based on educational best practices for vocabulary learning. Add keyboard navigation support for all prompts.",
+        "testStrategy": "Playtest with target age group (grades 3-5) to measure engagement and completion rates. Unit test signals and methods in SessionManager. QA checklist: verify second chances work, hints appear, and words are retried appropriately without breaking flow. Accessibility test for keyboard-only navigation.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 3,
+        "title": "Integrate Sound Design System",
+        "description": "Source and integrate sound effects and optional background music to enhance game feel and feedback.",
+        "details": "Using AudioManager.gd (from Phase 4), load 6 sound effect files (e.g., correct answer chime, incorrect buzz, button clicks) from CC0 sources like freesound.org or generate simple tones. Add optional background music loop with toggle. Integrate sounds into all interactions: correct/incorrect answers, button presses, transitions. Ensure audio pooling to prevent clipping and memory issues. Add volume controls in settings. Use Godot's AudioStreamPlayer for playback, following best practices for web/mobile audio compatibility.",
+        "testStrategy": "Audio testing: play all effects and music, check for clipping or delays. Cross-browser test on Chrome, Firefox, Safari. Playtest for appropriateness with kids. QA: verify sounds play at correct times, no memory leaks.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "Apply Visual Polish and Theme Consistency",
+        "description": "Enhance visual consistency, apply themes, add shadows, depth, and typography improvements across all scenes.",
+        "details": "Apply a unified theme to 9 scene files in Godot Editor, ensuring consistent styling for buttons, labels, and UI elements. Add shadows, depth effects using Godot's StyleBoxFlat or custom shaders. Perform typography pass for readability. Implement button hover/press animations using Tween. Add loading progress indicators with animated elements. Ensure full keyboard navigation support. Build ErrorDialog.tscn and HelpOverlay.tscn scenes as specified. Focus on professional, kid-friendly aesthetics.",
+        "testStrategy": "Visual QA: check consistency across scenes, hover/press feedback on buttons. Accessibility test for keyboard navigation. Performance test for smooth animations. Playtest for visual appeal and clarity.",
+        "priority": "medium",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "Add Activity-Specific Improvements and Animations",
+        "description": "Implement custom animations and interactions tailored to each of the 5 activity types for enhanced engagement.",
+        "details": "For each activity (e.g., matching, spelling), add standardized entry/exit animations using TransitionManager. Create custom micro-interactions like confetti on completion or mascot animations on loading screens. Integrate EffectsManager for activity-specific particle effects. Ensure all activities have consistent button interactions and keyboard polish. Add optional settings for reducing effects if overwhelming. Follow Godot 4.x animation best practices with AnimationPlayer or Tween.",
+        "testStrategy": "Playtest each activity for fun and engagement ratings. QA: verify animations are smooth, no stuttering. Technical test for performance impact. Measure session completion rate >85% and fun rating ≥4/5.",
+        "priority": "low",
+        "dependencies": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "status": "pending",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2025-11-07T21:34:44.308Z",
+      "updated": "2025-11-07T21:34:44.308Z",
+      "description": "Tasks for p5-overview context"
+    }
   }
 }

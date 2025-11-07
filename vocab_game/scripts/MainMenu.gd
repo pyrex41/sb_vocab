@@ -32,6 +32,10 @@ func _on_start_button_pressed():
 	if is_loading:
 		return
 
+	# Play button click sound
+	if AudioManager:
+		AudioManager.play(AudioManager.SOUND_BUTTON_CLICK)
+
 	_set_buttons_enabled(false)
 	start_button.text = "Starting... 🚀"
 
@@ -42,6 +46,10 @@ func _on_start_button_pressed():
 func _on_progress_button_pressed():
 	if is_loading:
 		return
+
+	# Play button click sound
+	if AudioManager:
+		AudioManager.play(AudioManager.SOUND_BUTTON_CLICK)
 
 	_set_buttons_enabled(false)
 	progress_button.text = "Loading... 📊"

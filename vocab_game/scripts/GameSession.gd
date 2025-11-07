@@ -72,6 +72,10 @@ func _ready():
 	SessionManager.loading_ended.connect(_on_loading_ended)
 	SessionManager.api_error.connect(_on_api_error)
 
+	# Play session start sound
+	if AudioManager:
+		AudioManager.play(AudioManager.SOUND_SESSION_START)
+
 	# Start the session
 	SessionManager.start_new_session("grade3")
 
@@ -132,9 +136,15 @@ func _on_attempt_result(correct: bool, feedback: String):
 
 	if correct:
 		feedback_panel.modulate = COLOR_CORRECT
+		# Play correct sound
+		if AudioManager:
+			AudioManager.play(AudioManager.SOUND_CORRECT)
 		_play_correct_animation()
 	else:
 		feedback_panel.modulate = COLOR_INCORRECT
+		# Play incorrect sound
+		if AudioManager:
+			AudioManager.play(AudioManager.SOUND_INCORRECT)
 		_play_incorrect_animation()
 
 	# Pop in the feedback panel with scale animation
@@ -201,6 +211,10 @@ func _create_celebration_particles():
 		)
 
 func _on_next_button_pressed():
+	# Play button click sound
+	if AudioManager:
+		AudioManager.play(AudioManager.SOUND_BUTTON_CLICK)
+
 	# Scale out the feedback panel
 	var tween = create_tween()
 	tween.set_ease(Tween.EASE_IN)

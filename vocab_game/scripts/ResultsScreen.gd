@@ -32,6 +32,10 @@ func _ready():
 	# Display session results
 	_show_results()
 
+	# Play session complete sound
+	if AudioManager:
+		AudioManager.play(AudioManager.SOUND_SESSION_COMPLETE)
+
 	# Animate the results screen entrance
 	_animate_entrance()
 
@@ -66,9 +70,17 @@ func _show_results():
 		title_label.text = "Keep Practicing! 💪"
 
 func _on_continue_pressed():
+	# Play button click sound
+	if AudioManager:
+		AudioManager.play(AudioManager.SOUND_BUTTON_CLICK)
+
 	get_tree().change_scene_to_file("res://scenes/GameSession.tscn")
 
 func _on_main_menu_pressed():
+	# Play button click sound
+	if AudioManager:
+		AudioManager.play(AudioManager.SOUND_BUTTON_CLICK)
+
 	get_tree().change_scene_to_file("res://scenes/MainMenu.tscn")
 
 func _animate_entrance():

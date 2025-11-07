@@ -1,0 +1,1257 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Project Setup and Investigation",
+        "description": "Set up the development environment, clone the vocab_game/ project, verify it runs, and study the architecture, signal flow, and SDK documentation.",
+        "details": "Clone or copy the vocab_game/ directory as the working directory. Open in Godot 4.3+. Run the mock implementation end-to-end to ensure all scenes load without errors. Map the signal flow between SessionManager and activities, document the MockBackend API contract, trace scene transitions, review data structures, and read DEV_NOTES.md and QUICKSTART.md. Review PlaycademySDK documentation, API reference, authentication flow, and deployment requirements. Compare mock API vs real API endpoints. Deliver an architecture diagram and integration checklist.",
+        "testStrategy": "Verify that the project opens in Godot without errors, all scenes load, mock backend runs a full session, and documentation is reviewed with key integration points noted.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set Up Development Environment and Clone Project",
+            "description": "Install Godot 4.3+ and clone the vocab_game/ directory to set up the working environment.",
+            "dependencies": [],
+            "details": "Ensure Godot 4.3 or higher is installed on the system. Clone or copy the vocab_game/ directory as the working directory. Open the project in Godot to confirm it loads without errors.",
+            "status": "pending",
+            "testStrategy": "Verify that Godot opens the project successfully and no errors appear in the console upon loading."
+          },
+          {
+            "id": 2,
+            "title": "Verify Project Execution and Review Documentation",
+            "description": "Run the mock implementation, study architecture, and review SDK documentation to understand the project structure.",
+            "dependencies": [
+              1
+            ],
+            "details": "Run the mock implementation end-to-end to ensure all scenes load without errors. Map signal flow between SessionManager and activities, document MockBackend API, trace scene transitions, review data structures, and read DEV_NOTES.md and QUICKSTART.md. Review PlaycademySDK docs, API reference, authentication, deployment. Compare mock vs real APIs. Create an architecture diagram and integration checklist.",
+            "status": "pending",
+            "testStrategy": "Confirm all scenes load, mock backend runs a full session, and key documentation points are noted with an architecture diagram produced."
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "SDK Installation and Configuration",
+        "description": "Install and configure the PlaycademySDK in the Godot project.",
+        "details": "Open Godot AssetLib, search for 'Playcademy', install the Playcademy bundle. Enable plugins: Playcademy Manifest Exporter and Playcademy Sandbox. Add PlaycademySDK.gd to AutoLoad as 'PlaycademySdk'. Verify the SDK loads without errors. Ensure the project is ready for backend integration.",
+        "testStrategy": "Check that the SDK is installed, plugins are enabled, AutoLoad is set, and no errors appear in the Godot console when running the project.",
+        "priority": "high",
+        "dependencies": [
+          1
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Open Godot AssetLib and Search for Playcademy",
+            "description": "Launch Godot and navigate to the AssetLib to search for the Playcademy bundle.",
+            "dependencies": [],
+            "details": "Open the Godot editor, go to the AssetLib tab, enter 'Playcademy' in the search bar, and locate the Playcademy bundle for installation.",
+            "status": "pending",
+            "testStrategy": "Verify that the AssetLib opens and the search returns the correct Playcademy bundle."
+          },
+          {
+            "id": 2,
+            "title": "Install the Playcademy Bundle",
+            "description": "Download and install the Playcademy bundle from the AssetLib.",
+            "dependencies": [
+              1
+            ],
+            "details": "Click on the Playcademy bundle in the AssetLib, initiate the download and installation process, and wait for it to complete without errors.",
+            "status": "pending",
+            "testStrategy": "Check that the bundle installs successfully and appears in the project's addons folder."
+          },
+          {
+            "id": 3,
+            "title": "Enable Playcademy Manifest Exporter Plugin",
+            "description": "Activate the Playcademy Manifest Exporter plugin in the project settings.",
+            "dependencies": [
+              2
+            ],
+            "details": "Go to Project > Project Settings > Plugins, find 'Playcademy Manifest Exporter', and enable it by checking the box.",
+            "status": "pending",
+            "testStrategy": "Confirm that the plugin is enabled and no errors appear in the console."
+          },
+          {
+            "id": 4,
+            "title": "Enable Playcademy Sandbox Plugin",
+            "description": "Activate the Playcademy Sandbox plugin in the project settings.",
+            "dependencies": [
+              3
+            ],
+            "details": "In Project Settings > Plugins, locate 'Playcademy Sandbox' and enable it by checking the box.",
+            "status": "pending",
+            "testStrategy": "Verify that the plugin is enabled and integrates without issues."
+          },
+          {
+            "id": 5,
+            "title": "Add PlaycademySDK.gd to AutoLoad and Verify",
+            "description": "Configure PlaycademySDK.gd as an AutoLoad singleton and ensure the SDK loads properly.",
+            "dependencies": [
+              4
+            ],
+            "details": "Go to Project > Project Settings > AutoLoad, add PlaycademySDK.gd with the name 'PlaycademySdk', then run the project to verify no errors and readiness for backend integration.",
+            "status": "pending",
+            "testStrategy": "Run the project and check the console for no errors, confirming the SDK is loaded and the project is prepared for backend integration."
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Replace Session Start Integration",
+        "description": "Replace the MockBackend.start_session call with PlaycademySdk.backend.request for session start.",
+        "details": "In scripts/SessionManager.gd, modify start_new_session(grade: int) to use await PlaycademySdk.backend.request('POST', '/session/start', {'user_id': PlaycademySdk.user_id, 'grade': grade}). Handle the response, set current_session_id and activity_queue, emit session_started. Add loading states and error handling as per the PRD examples.",
+        "testStrategy": "Test starting a session for each grade level (3,4,5) and verify the session_id is set, activities are loaded, and no errors occur. Check that the response matches the expected JSON structure.",
+        "priority": "high",
+        "dependencies": [
+          2
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Modify start_new_session method to use PlaycademySdk.backend.request",
+            "description": "Update the start_new_session function in SessionManager.gd to replace MockBackend.start_session with an asynchronous call to PlaycademySdk.backend.request using 'POST' to '/session/start' with appropriate payload, and handle the response to set current_session_id, activity_queue, and emit session_started signal.",
+            "dependencies": [],
+            "details": "In the start_new_session(grade: int) method, change the implementation to use await PlaycademySdk.backend.request('POST', '/session/start', {'user_id': PlaycademySdk.user_id, 'grade': grade}). Parse the response JSON to extract session_id and activities, assign them to current_session_id and activity_queue respectively, then emit the session_started signal with the necessary data. Ensure the method is async and properly awaits the request.",
+            "status": "pending",
+            "testStrategy": "Test starting a session for each grade level (3,4,5) and verify the session_id is set, activities are loaded, and the session_started signal is emitted correctly."
+          },
+          {
+            "id": 2,
+            "title": "Add loading states and error handling to session start",
+            "description": "Implement loading indicators and comprehensive error handling for the session start process, including network failures, invalid responses, and user feedback as per PRD examples.",
+            "dependencies": [
+              1
+            ],
+            "details": "Add loading state management (e.g., show a loading spinner or disable UI) before the API call and hide it after. Implement try-catch blocks or error checking for the backend request. Handle errors by logging them, displaying user-friendly messages (e.g., via signals or UI updates), and possibly retrying or falling back gracefully. Ensure compliance with PRD examples for error handling in session management.",
+            "status": "pending",
+            "testStrategy": "Simulate network errors and invalid responses during session start, verify loading states are shown/hidden appropriately, and check that errors are handled without crashing, with proper user feedback."
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Replace Answer Submission Integration",
+        "description": "Replace the MockBackend.submit_attempt call with PlaycademySdk.backend.request for answer submission.",
+        "details": "In scripts/SessionManager.gd, modify submit_answer(answer: String) to use await PlaycademySdk.backend.request('POST', '/session/attempt', {'session_id': current_session_id, 'activity_index': current_activity_index, 'answer': answer}). Emit attempt_result with response.correct and response.feedback. Include loading states and error handling.",
+        "testStrategy": "Submit answers for each activity type (correct and incorrect), verify feedback is displayed correctly, and check that the API response matches the expected format. Ensure auto-advance works after correct answers.",
+        "priority": "high",
+        "dependencies": [
+          3
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Update submit_answer method to use PlaycademySdk.backend.request",
+            "description": "Modify the submit_answer function in scripts/SessionManager.gd to replace MockBackend.submit_attempt with await PlaycademySdk.backend.request('POST', '/session/attempt', payload).",
+            "dependencies": [],
+            "details": "In the submit_answer(answer: String) method, construct the payload with session_id, activity_index, and answer. Use await for the API call to ensure asynchronous handling. This subtask focuses solely on replacing the backend call without handling responses yet.",
+            "status": "pending",
+            "testStrategy": "Verify that the API call is made with correct parameters by checking logs or mocking the request."
+          },
+          {
+            "id": 2,
+            "title": "Implement response handling for answer submission",
+            "description": "Add logic to handle the API response, emit attempt_result signal with correct and feedback, and include loading states and error handling.",
+            "dependencies": [
+              1
+            ],
+            "details": "After the API call in submit_answer, parse the response for correct and feedback fields. Emit the attempt_result signal accordingly. Implement loading states (e.g., show spinner during request) and error handling (e.g., display error messages on failure). Ensure the method handles timeouts and invalid responses gracefully.",
+            "status": "pending",
+            "testStrategy": "Test with correct and incorrect answers, verify signals are emitted correctly, loading states appear, and errors are handled without crashes."
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Replace Session End Integration",
+        "description": "Replace the MockBackend.end_session call with PlaycademySdk.backend.request for session end.",
+        "details": "In scripts/SessionManager.gd, modify _end_session() to use await PlaycademySdk.backend.request('POST', '/session/end', {'session_id': current_session_id}). Emit session_ended with the response summary. Add loading states and error handling.",
+        "testStrategy": "Complete a full session and verify the end response includes total_activities, correct_count, accuracy, etc. Check that progress is updated and the results screen displays correctly.",
+        "priority": "high",
+        "dependencies": [
+          4
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Modify _end_session() method to use PlaycademySdk.backend.request",
+            "description": "Update the _end_session() function in scripts/SessionManager.gd to replace the MockBackend.end_session call with an asynchronous request using PlaycademySdk.backend.request('POST', '/session/end', {'session_id': current_session_id}).",
+            "dependencies": [],
+            "details": "Locate the _end_session() method in the SessionManager.gd script. Replace the existing MockBackend.end_session call with await PlaycademySdk.backend.request('POST', '/session/end', {'session_id': current_session_id}). Ensure the method is async and handles the await properly. Add loading states by emitting a loading signal before the request and stopping it after. Include basic error handling for network failures or invalid responses.",
+            "status": "pending",
+            "testStrategy": "Test the modified method by triggering session end in a mock session and verifying the API call is made correctly without errors."
+          },
+          {
+            "id": 2,
+            "title": "Emit session_ended signal with response summary and add error handling",
+            "description": "After the API request in _end_session(), emit the session_ended signal with the response summary, including total_activities, correct_count, accuracy, etc. Enhance error handling for API failures.",
+            "dependencies": [
+              1
+            ],
+            "details": "Following the API request in _end_session(), parse the response to extract summary data such as total_activities, correct_count, and accuracy. Emit the session_ended signal with this summary data. Implement comprehensive error handling: catch exceptions from the request, log errors, display user-friendly messages, and ensure the session can be retried or gracefully failed. Update loading states accordingly and verify progress updates in the UI.",
+            "status": "pending",
+            "testStrategy": "Simulate session end scenarios, including successful responses and errors, to check that the signal is emitted with correct summary data, error messages appear, and the results screen displays accurately."
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Implement Error Handling and Loading States",
+        "description": "Add comprehensive error handling and loading indicators for all API calls.",
+        "details": "Implement _handle_api_error(error: Dictionary) in SessionManager.gd to show user-friendly messages for NETWORK_ERROR, TIMEOUT, AUTH_ERROR, etc. Add loading spinners during session start, submission, and end. Disable buttons during submissions. Use signals or direct UI updates for loading states.",
+        "testStrategy": "Simulate network errors, timeouts, and auth issues. Verify appropriate error dialogs appear, loading indicators show/hide correctly, and the app doesn't crash. Test retry functionality if implemented.",
+        "priority": "medium",
+        "dependencies": [
+          5
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Implement Error Handling in SessionManager",
+            "description": "Develop the _handle_api_error function in SessionManager.gd to manage various error types like NETWORK_ERROR, TIMEOUT, and AUTH_ERROR, displaying user-friendly messages.",
+            "dependencies": [],
+            "details": "In SessionManager.gd, implement _handle_api_error(error: Dictionary) to parse error types and show appropriate dialogs or notifications. Ensure it handles edge cases like unknown errors gracefully without crashing the app.",
+            "status": "pending",
+            "testStrategy": null
+          },
+          {
+            "id": 2,
+            "title": "Add Loading UI Components",
+            "description": "Integrate loading spinners and disable buttons during API calls for session start, submission, and end.",
+            "dependencies": [],
+            "details": "Add loading indicators (e.g., spinners) to the UI using signals or direct updates from SessionManager. Disable interactive buttons during submissions to prevent multiple requests. Ensure indicators appear and disappear correctly based on API call states.",
+            "status": "pending",
+            "testStrategy": null
+          },
+          {
+            "id": 3,
+            "title": "Integrate and Test Error Handling and Loading States",
+            "description": "Combine error handling and loading UI into the full session flow and perform integration testing.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Connect the error handling and loading components in SessionManager.gd and UI scripts. Test the complete implementation by simulating errors and verifying UI responses, loading states, and no crashes. Document any issues and ensure user experience is smooth.",
+            "status": "pending",
+            "testStrategy": "Simulate network errors, timeouts, and auth issues in a test environment. Verify error dialogs, loading indicators, button states, and app stability. Check for proper fallback and no blocking behavior."
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Audio Integration",
+        "description": "Implement audio playback for the Spelling activity using backend URLs.",
+        "details": "In scripts/activities/Spelling.gd, add an AudioStreamPlayer, load audio from activity_data.word.audio_url using HTTPRequest. Play audio on button press. Handle failures gracefully with text fallback. Use MP3 format for web compatibility.",
+        "testStrategy": "Test audio loading and playback in the Spelling activity. Verify it works on web export, handles missing audio, and falls back to text if needed. Check performance and no blocking on load.",
+        "priority": "medium",
+        "dependencies": [
+          6
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Set up AudioStreamPlayer for audio playback in Spelling activity",
+            "description": "Add an AudioStreamPlayer node to the Spelling.gd script and configure it to load and play audio from the backend URL using HTTPRequest when the play button is pressed.",
+            "dependencies": [],
+            "details": "In scripts/activities/Spelling.gd, instantiate an AudioStreamPlayer node. Use HTTPRequest to asynchronously fetch the audio file from activity_data.word.audio_url. Ensure the audio is in MP3 format for web compatibility. Connect the HTTPRequest to handle the response and load the audio stream into the player. Trigger playback on button press after successful loading.",
+            "status": "pending",
+            "testStrategy": "Test audio loading and playback in the Spelling activity on web export, verifying it plays correctly on button press."
+          },
+          {
+            "id": 2,
+            "title": "Implement failure handling and text fallback for audio loading",
+            "description": "Add error handling for audio loading failures, ensuring the app falls back to displaying text instead of crashing or failing silently.",
+            "dependencies": [
+              1
+            ],
+            "details": "In the HTTPRequest response handler, check for errors such as network failures or invalid URLs. If loading fails, disable audio playback and display the word text as a fallback. Log errors appropriately and ensure the UI remains functional. Handle asynchronous loading to avoid blocking the main thread.",
+            "status": "pending",
+            "testStrategy": "Simulate network failures and missing audio URLs, verify that text fallback appears and the activity continues without errors."
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "UI Polish and Animations",
+        "description": "Polish the UI to match Playcademy brand and add transitions/animations.",
+        "details": "Update color palette to Playcademy brand (#4F46E5 primary, etc.). Add hover/press effects to buttons. Implement activity transitions with fade in/out using Tweens. Add feedback animations for correct/incorrect responses. Ensure responsive layout and age-appropriate design.",
+        "testStrategy": "Visually inspect UI elements for brand compliance, test button interactions, verify transitions are smooth, and check responsiveness on different screen sizes. Ensure animations don't affect performance.",
+        "priority": "medium",
+        "dependencies": [
+          7
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Update Color Palette to Playcademy Brand",
+            "description": "Modify the UI color scheme to align with the Playcademy brand guidelines, including primary color #4F46E5 and other specified colors.",
+            "dependencies": [],
+            "details": "Review all UI elements such as backgrounds, text, and icons. Update theme files or style resources in Godot to apply the new color palette consistently across scenes. Ensure accessibility and contrast ratios are maintained.",
+            "status": "pending",
+            "testStrategy": "Visually inspect UI elements for brand compliance and color accuracy on different screens."
+          },
+          {
+            "id": 2,
+            "title": "Add Hover and Press Effects to Buttons",
+            "description": "Implement interactive effects for buttons to enhance user experience with hover and press animations.",
+            "dependencies": [
+              1
+            ],
+            "details": "In Godot, use AnimationPlayer or Tween nodes to add subtle scale, color, or shadow changes on button hover and press states. Apply to all interactive buttons in the application, ensuring effects are smooth and age-appropriate.",
+            "status": "pending",
+            "testStrategy": "Test button interactions on various devices to verify effects trigger correctly and do not cause performance issues."
+          },
+          {
+            "id": 3,
+            "title": "Implement Activity Transitions and Feedback Animations",
+            "description": "Add fade in/out transitions between activities and animations for correct/incorrect responses.",
+            "dependencies": [
+              1,
+              2
+            ],
+            "details": "Use Tween nodes in Godot to create fade in/out effects for activity changes. For feedback, add animations like checkmarks for correct answers and X marks for incorrect ones, possibly with color changes or shakes. Integrate with SessionManager for response handling.",
+            "status": "pending",
+            "testStrategy": "Verify transitions are smooth, feedback animations display correctly after submissions, and no glitches occur during activity switches."
+          },
+          {
+            "id": 4,
+            "title": "Ensure Responsive Layout and Age-Appropriate Design",
+            "description": "Adjust UI layouts for responsiveness across screen sizes and ensure the design is suitable for the target age group.",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Use Godot's container nodes and anchors to make layouts adapt to different resolutions. Review font sizes, spacing, and element sizes for age-appropriateness, avoiding clutter and ensuring intuitive navigation for children.",
+            "status": "pending",
+            "testStrategy": "Test on multiple screen sizes and devices to check responsiveness, and gather feedback on usability for the intended age group."
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Comprehensive Testing",
+        "description": "Perform integration, edge case, and performance testing.",
+        "details": "Test complete session flow for all grades, all activity types with correct/incorrect answers, progress persistence, network issues, timeouts, invalid data, and empty states. Profile performance for load times, FPS, and memory usage. Optimize as needed.",
+        "testStrategy": "Run through all test cases from Appendix C. Document results, fix any bugs found, and ensure metrics like <3s load time, 60 FPS, and <1% error rate are met. Use Godot profiler for performance.",
+        "priority": "high",
+        "dependencies": [
+          8
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Integration Testing",
+            "description": "Conduct integration testing to ensure the complete session flow works seamlessly across all grades and activity types, including correct and incorrect answers, and progress persistence.",
+            "dependencies": [],
+            "details": "Test the full session flow for all grades and activity types, verifying that correct/incorrect answers are handled properly, progress is saved and persisted, and the overall integration between components functions without issues. Use automated scripts or manual testing to cover all scenarios.",
+            "status": "pending",
+            "testStrategy": "Run through all test cases from Appendix C, document results, and ensure no integration failures occur."
+          },
+          {
+            "id": 2,
+            "title": "Edge Case Handling",
+            "description": "Test edge cases such as network issues, timeouts, invalid data, and empty states to ensure robust error handling.",
+            "dependencies": [],
+            "details": "Simulate network failures, timeouts, invalid data inputs, and empty states in the application. Verify that the app handles these gracefully without crashing, displays appropriate user messages, and maintains data integrity. Include tests for progress persistence during these scenarios.",
+            "status": "pending",
+            "testStrategy": "Simulate various edge cases using tools like network simulators, document how the app responds, and confirm error rates are below 1%."
+          },
+          {
+            "id": 3,
+            "title": "Performance Profiling",
+            "description": "Profile the application's performance metrics including load times, FPS, and memory usage.",
+            "dependencies": [],
+            "details": "Use profiling tools to measure load times, frame rates (aiming for 60 FPS), and memory consumption during typical usage. Identify bottlenecks and areas for improvement. Ensure metrics meet targets like load times under 3 seconds and stable FPS.",
+            "status": "pending",
+            "testStrategy": "Use Godot profiler to collect performance data, analyze results, and document any deviations from targets."
+          },
+          {
+            "id": 4,
+            "title": "Bug Fixes",
+            "description": "Identify, document, and fix any bugs discovered during testing phases.",
+            "dependencies": [
+              1,
+              2,
+              3
+            ],
+            "details": "Review test results from integration, edge case, and performance testing. Log all bugs found, prioritize them, and implement fixes. Ensure fixes do not introduce new issues and re-test affected areas. Focus on critical bugs impacting functionality or performance.",
+            "status": "pending",
+            "testStrategy": "Document bugs in a tracking system, fix them iteratively, and verify fixes through re-testing to maintain error rates below 1%."
+          },
+          {
+            "id": 5,
+            "title": "Optimization",
+            "description": "Optimize the application based on performance profiling results to improve load times, FPS, and memory usage.",
+            "dependencies": [
+              3
+            ],
+            "details": "Based on profiling data, implement optimizations such as code refactoring, asset compression, or algorithm improvements. Target specific metrics like reducing load times to under 3 seconds, maintaining 60 FPS, and minimizing memory usage. Re-profile after changes to confirm improvements.",
+            "status": "pending",
+            "testStrategy": "Re-run performance tests post-optimization, compare metrics against baselines, and ensure all targets are met without degrading functionality."
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Deployment to Staging",
+        "description": "Configure web export and deploy to Playcademy staging.",
+        "details": "In Godot, configure Web (Runnable) preset with custom HTML shell from Playcademy addon, export path, and settings. Use Playcademy CLI to login and deploy to staging. Verify game loads, auth works, and APIs respond.",
+        "testStrategy": "Check that export generates correct files, staging deployment succeeds, game loads without console errors, and full session works in staging environment.",
+        "priority": "high",
+        "dependencies": [
+          9
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Configure Web Export Preset in Godot",
+            "description": "Set up the Web (Runnable) preset in Godot with the custom HTML shell from the Playcademy addon, including export path and necessary settings for staging deployment.",
+            "dependencies": [],
+            "details": "In the Godot editor, navigate to Project > Export, select the Web (Runnable) preset, and configure it to use the custom HTML shell provided by the Playcademy addon. Set the export path to a designated directory for staging builds, and adjust any required settings such as threading or extensions to ensure compatibility with the Playcademy platform. Ensure all necessary assets and scripts are included in the export configuration.",
+            "status": "pending",
+            "testStrategy": "Verify that the export generates the correct HTML, JS, and data files without errors, and that the preset settings match the Playcademy requirements."
+          },
+          {
+            "id": 2,
+            "title": "Deploy to Staging and Verify Functionality",
+            "description": "Use the Playcademy CLI to login and deploy the exported build to the staging environment, then verify that the game loads correctly, authentication works, and APIs respond as expected.",
+            "dependencies": [
+              1
+            ],
+            "details": "After configuring the export, run the Godot export process to generate the web build. Then, use the Playcademy CLI to authenticate (login) and deploy the build to the staging environment with the appropriate command. Once deployed, access the staging URL to check that the game loads without console errors, user authentication functions properly, and all API calls (such as session start, submissions, and end) return expected responses. Monitor for any deployment-specific issues and ensure the environment is fully operational.",
+            "status": "pending",
+            "testStrategy": "Test the staging deployment by performing a full session: load the game, authenticate, complete activities, submit responses, and end the session. Confirm no console errors, correct API responses, and that progress updates and results display accurately."
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "title": "Cross-Browser Testing and Production Deployment",
+        "description": "Test on multiple browsers and deploy to production.",
+        "details": "Test on Chrome, Firefox, Safari, Edge for full functionality, audio, touch events, and performance. After approval, deploy to production using playcademy deploy --env production. Verify public URL, SSL, and analytics.",
+        "testStrategy": "Document browser compatibility, ensure no issues, and confirm production deployment is live and functional. Check for any deployment-specific errors.",
+        "priority": "medium",
+        "dependencies": [
+          10
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Cross-Browser Testing",
+            "description": "Conduct thorough testing of the application on multiple browsers including Chrome, Firefox, Safari, and Edge to ensure full functionality, audio handling, touch events, and performance.",
+            "dependencies": [],
+            "details": "Set up test environments for each browser. Run comprehensive tests covering all features, interactions, and performance metrics. Document any issues found and ensure compatibility across versions.",
+            "status": "pending",
+            "testStrategy": "Use automated tools like Selenium or manual testing to verify functionality, audio, touch events, and performance benchmarks. Record test results and browser-specific issues."
+          },
+          {
+            "id": 2,
+            "title": "Browser Compatibility Documentation",
+            "description": "Document the compatibility results from testing across different browsers, including any issues and resolutions.",
+            "dependencies": [
+              1
+            ],
+            "details": "Compile a detailed report on browser compatibility, listing supported features, known issues, and workarounds. Update project documentation with this information for future reference.",
+            "status": "pending",
+            "testStrategy": "Review test logs and results to ensure all compatibility aspects are documented accurately. Validate that the documentation is accessible and up-to-date."
+          },
+          {
+            "id": 3,
+            "title": "Production Deployment",
+            "description": "Deploy the application to production environment after testing approval, and verify deployment success.",
+            "dependencies": [
+              2
+            ],
+            "details": "Execute the deployment command 'playcademy deploy --env production'. Verify the public URL is accessible, SSL certificate is valid, and analytics are functioning correctly. Monitor for any deployment errors.",
+            "status": "pending",
+            "testStrategy": "After deployment, perform checks on the live site for URL accessibility, SSL, and analytics integration. Run a quick smoke test to ensure core functionality works in production."
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "title": "Documentation and Feedback Report",
+        "description": "Update documentation, write feedback report, and submit to GitHub.",
+        "details": "Update README.md, create INTEGRATION.md and DEPLOYMENT.md with guides. Write a comprehensive feedback report on developer experience, SDK, etc. Add code comments, clean up, and submit via GitHub PR to dev branch.",
+        "testStrategy": "Verify all documentation is complete and accurate. Ensure feedback report covers all required sections. Check that PR is created with description and report attached.",
+        "priority": "low",
+        "dependencies": [
+          11
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Update Documentation Files",
+            "description": "Update README.md, create INTEGRATION.md and DEPLOYMENT.md with detailed guides, add code comments, and perform code cleanup.",
+            "dependencies": [],
+            "details": "Revise README.md to reflect current project state. Create new INTEGRATION.md with step-by-step integration guides for the SDK. Create DEPLOYMENT.md with deployment instructions. Add comprehensive code comments to key scripts and clean up any unused code or inconsistencies to ensure clarity and maintainability.",
+            "status": "pending",
+            "testStrategy": "Verify that all documentation files are updated, new files are created with accurate guides, code comments are added, and cleanup is performed without introducing errors."
+          },
+          {
+            "id": 2,
+            "title": "Write Feedback Report and Submit PR",
+            "description": "Write a comprehensive feedback report on developer experience, SDK usage, and other aspects, then submit via GitHub PR to dev branch.",
+            "dependencies": [],
+            "details": "Compile a detailed feedback report covering developer experience, SDK integration challenges, performance observations, and recommendations. Attach the report to a GitHub Pull Request targeting the dev branch, including a clear description of changes made to documentation and code.",
+            "status": "pending",
+            "testStrategy": "Ensure the feedback report is comprehensive and covers all required sections. Confirm that the PR is created with the report attached and includes a proper description."
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "created": "2025-11-06T04:01:39.234Z",
+      "updated": "2025-11-06T04:01:39.234Z",
+      "description": "Tasks for master context"
+    }
+  },
+  "integrate": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "Remove MockBackend References from Multiple Choice Activity",
+        "description": "Update multiple_choice_activity.gd to remove the call to MockBackend.get_random_wrong_definitions since the new API provides options directly.",
+        "details": "In the setup function of vocab_game/scripts/activities/multiple_choice_activity.gd, locate and remove the line calling MockBackend.get_random_wrong_definitions. Ensure the activity now relies solely on the options array from the activity_data provided via SessionManager signals.",
+        "testStrategy": "Run the multiple choice activity and verify that options are populated correctly from the API without errors. Check console for any remaining MockBackend references.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Locate the multiple_choice_activity.gd file and identify the setup function",
+            "description": "Open the vocab_game/scripts/activities/multiple_choice_activity.gd file and find the setup function where MockBackend.get_random_wrong_definitions is called.",
+            "dependencies": [],
+            "details": "Use a code editor to navigate to the file path vocab_game/scripts/activities/multiple_choice_activity.gd. Search for the 'setup' function within the script to understand its structure and locate the relevant code block.",
+            "status": "pending",
+            "testStrategy": null
+          },
+          {
+            "id": 2,
+            "title": "Identify the specific line calling MockBackend.get_random_wrong_definitions",
+            "description": "Within the setup function, pinpoint the exact line or lines that invoke MockBackend.get_random_wrong_definitions.",
+            "dependencies": [
+              1
+            ],
+            "details": "Examine the setup function code carefully. Look for any calls to MockBackend, specifically get_random_wrong_definitions. Note the context, such as variable assignments or loops, to ensure accurate removal.",
+            "status": "pending",
+            "testStrategy": null
+          },
+          {
+            "id": 3,
+            "title": "Remove the MockBackend.get_random_wrong_definitions call",
+            "description": "Delete the line or code block that calls MockBackend.get_random_wrong_definitions from the setup function.",
+            "dependencies": [
+              2
+            ],
+            "details": "Edit the setup function by removing the identified line(s). Ensure no partial references remain. Save the file after removal. This step simplifies the code to rely on external data sources.",
+            "status": "pending",
+            "testStrategy": null
+          },
+          {
+            "id": 4,
+            "title": "Verify reliance on options array from activity_data",
+            "description": "Confirm that the activity now uses the options array provided via SessionManager signals instead of the removed MockBackend call.",
+            "dependencies": [
+              3
+            ],
+            "details": "Review the updated setup function to ensure it processes the options from activity_data correctly. Check for any signal connections or data handling that populate the options array from SessionManager.",
+            "status": "pending",
+            "testStrategy": null
+          },
+          {
+            "id": 5,
+            "title": "Test the multiple choice activity for correct option population",
+            "description": "Run the multiple choice activity and verify that options are loaded from the API without errors, checking for any MockBackend references in the console.",
+            "dependencies": [
+              4
+            ],
+            "details": "Launch the game, navigate to the multiple choice activity, and interact with it. Monitor the console for errors. Ensure options are populated correctly from the activity_data via SessionManager signals, without any fallback to MockBackend.",
+            "status": "pending",
+            "testStrategy": "Run the multiple choice activity and verify that options are populated correctly from the API without errors. Check console for any remaining MockBackend references."
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Remove MockBackend Logic from Synonym Antonym Activity",
+        "description": "Update synonym_antonym_activity.gd to remove mock logic for synthesizing wrong options/synonyms, as the new API returns all required options.",
+        "details": "In vocab_game/scripts/activities/synonym_antonym_activity.gd, remove the setup_synonym_choices and setup_antonym_choices functions' logic that iterates over MockBackend.vocabulary_data. Update to use the options from activity_data.",
+        "testStrategy": "Test synonym and antonym activities to ensure options are loaded from API data. Confirm no errors related to MockBackend.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Locate and analyze synonym_antonym_activity.gd file",
+            "description": "Open the vocab_game/scripts/activities/synonym_antonym_activity.gd file and review the current implementation of setup_synonym_choices and setup_antonym_choices functions to understand the MockBackend dependencies.",
+            "dependencies": [],
+            "details": "Use a code editor to open the file and examine the functions that iterate over MockBackend.vocabulary_data. Note the specific lines that need to be modified or removed to prepare for the update.",
+            "status": "pending",
+            "testStrategy": null
+          },
+          {
+            "id": 2,
+            "title": "Remove MockBackend logic from setup_synonym_choices function",
+            "description": "Modify the setup_synonym_choices function to eliminate the iteration over MockBackend.vocabulary_data and any related mock logic for generating wrong options.",
+            "dependencies": [
+              1
+            ],
+            "details": "In the setup_synonym_choices function, remove the code that accesses MockBackend.vocabulary_data. Ensure the function is prepared to use options directly from activity_data instead.",
+            "status": "pending",
+            "testStrategy": null
+          },
+          {
+            "id": 3,
+            "title": "Remove MockBackend logic from setup_antonym_choices function",
+            "description": "Modify the setup_antonym_choices function to eliminate the iteration over MockBackend.vocabulary_data and any related mock logic for generating wrong options.",
+            "dependencies": [
+              1
+            ],
+            "details": "In the setup_antonym_choices function, remove the code that accesses MockBackend.vocabulary_data. Ensure the function is prepared to use options directly from activity_data instead.",
+            "status": "pending",
+            "testStrategy": null
+          },
+          {
+            "id": 4,
+            "title": "Update functions to use activity_data options",
+            "description": "Integrate the use of activity_data to populate synonym and antonym choices directly from the API-provided options, replacing the removed MockBackend logic.",
+            "dependencies": [
+              2,
+              3
+            ],
+            "details": "Modify both setup_synonym_choices and setup_antonym_choices to read and use the options array from activity_data. Ensure the functions correctly handle the data structure provided by the new API.",
+            "status": "pending",
+            "testStrategy": null
+          },
+          {
+            "id": 5,
+            "title": "Test synonym and antonym activities for correct option loading",
+            "description": "Run tests to verify that synonym and antonym activities load options from API data without MockBackend references and confirm no errors occur.",
+            "dependencies": [
+              4
+            ],
+            "details": "Execute the synonym and antonym activities in the game, check that options are populated correctly from activity_data, and monitor the console for any MockBackend-related errors or warnings.",
+            "status": "pending",
+            "testStrategy": "Test synonym and antonym activities to ensure options are loaded from API data. Confirm no errors related to MockBackend."
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Update Activity Controller to Remove MockBackend Calls",
+        "description": "Remove all references to MockBackend.get_current_activity() and MockBackend.get_progress() in activity_controller.gd, relying on SessionManager signals.",
+        "details": "In vocab_game/scripts/activity_controller.gd, update _on_answer_submitted, _ready, and update_progress_display functions to remove MockBackend calls. Connect to SessionManager's activity_changed signal for data updates.",
+        "testStrategy": "Start a session and navigate activities, verifying progress updates without MockBackend errors. Check signal connections.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Update _on_answer_submitted function in activity_controller.gd",
+            "description": "Remove all references to MockBackend.get_current_activity() and MockBackend.get_progress() from the _on_answer_submitted function in activity_controller.gd.",
+            "dependencies": [],
+            "details": "Locate the _on_answer_submitted function in vocab_game/scripts/activity_controller.gd. Identify and remove any calls to MockBackend.get_current_activity() or MockBackend.get_progress(). Ensure the function logic relies on SessionManager signals instead. This may involve adjusting how answers are processed and progress is handled.",
+            "status": "pending",
+            "testStrategy": "Test by submitting answers in the game and verifying that progress updates occur without errors related to MockBackend."
+          },
+          {
+            "id": 2,
+            "title": "Update _ready function in activity_controller.gd",
+            "description": "Remove all references to MockBackend.get_current_activity() and MockBackend.get_progress() from the _ready function in activity_controller.gd.",
+            "dependencies": [],
+            "details": "In the _ready function of vocab_game/scripts/activity_controller.gd, remove any initialization code that calls MockBackend.get_current_activity() or MockBackend.get_progress(). Replace with appropriate setup for SessionManager signal connections if needed.",
+            "status": "pending",
+            "testStrategy": "Run the game and check that the activity controller initializes correctly without MockBackend calls, ensuring no startup errors."
+          },
+          {
+            "id": 3,
+            "title": "Update update_progress_display function in activity_controller.gd",
+            "description": "Remove all references to MockBackend.get_current_activity() and MockBackend.get_progress() from the update_progress_display function in activity_controller.gd.",
+            "dependencies": [],
+            "details": "Edit the update_progress_display function in vocab_game/scripts/activity_controller.gd to eliminate calls to MockBackend.get_progress(). Modify the function to update progress display based on data from SessionManager signals.",
+            "status": "pending",
+            "testStrategy": "Navigate through activities and verify that progress display updates accurately without relying on MockBackend."
+          },
+          {
+            "id": 4,
+            "title": "Add signal connections to SessionManager in activity_controller.gd",
+            "description": "Connect to SessionManager's activity_changed signal for data updates in activity_controller.gd.",
+            "dependencies": [],
+            "details": "In vocab_game/scripts/activity_controller.gd, add code to connect to SessionManager's activity_changed signal. This could be done in the _ready function or another appropriate place. Ensure the connection triggers updates to current activity and progress data.",
+            "status": "pending",
+            "testStrategy": "Start a session and navigate activities, verifying that signal connections work and progress updates without MockBackend errors."
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Remove get_progress_data from Session Manager",
+        "description": "Eliminate the get_progress_data function in session_manager.gd as its logic has been moved to ProgressScreen.gd.",
+        "details": "Delete the get_progress_data function from vocab_game/scripts/session_manager.gd since it's no longer needed internally.",
+        "testStrategy": "Verify that progress loading works via ProgressScreen.gd without calling this removed function. Run progress view tests.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Locate the get_progress_data function in session_manager.gd",
+            "description": "Open the vocab_game/scripts/session_manager.gd file and find the get_progress_data function definition.",
+            "dependencies": [],
+            "details": "Use a code editor to navigate to the session_manager.gd file in the vocab_game/scripts directory. Search for the function name 'get_progress_data' to pinpoint its location in the code.",
+            "status": "pending",
+            "testStrategy": null
+          },
+          {
+            "id": 2,
+            "title": "Remove the get_progress_data function from session_manager.gd",
+            "description": "Delete the entire get_progress_data function, including its signature and body, from the file.",
+            "dependencies": [
+              1
+            ],
+            "details": "Carefully select and delete the function definition, ensuring no partial code remains. This includes the function keyword, name, parameters, and all lines within its scope.",
+            "status": "pending",
+            "testStrategy": null
+          },
+          {
+            "id": 3,
+            "title": "Check for internal references to get_progress_data in session_manager.gd",
+            "description": "Search the session_manager.gd file for any remaining calls or references to the get_progress_data function.",
+            "dependencies": [
+              2
+            ],
+            "details": "Perform a search within the file for 'get_progress_data' to ensure no internal dependencies or calls exist. If found, remove or update them accordingly.",
+            "status": "pending",
+            "testStrategy": null
+          },
+          {
+            "id": 4,
+            "title": "Verify ProgressScreen.gd handles progress data independently",
+            "description": "Confirm that ProgressScreen.gd can load and display progress data without relying on the removed function.",
+            "dependencies": [
+              2
+            ],
+            "details": "Review the ProgressScreen.gd script to ensure it has its own logic for retrieving and displaying progress data, possibly through SessionManager signals or direct API calls.",
+            "status": "pending",
+            "testStrategy": "Run progress view tests to ensure loading works via ProgressScreen.gd."
+          },
+          {
+            "id": 5,
+            "title": "Test the application to ensure no errors after removal",
+            "description": "Run the project and verify that progress functionality works correctly without the get_progress_data function.",
+            "dependencies": [
+              2,
+              3,
+              4
+            ],
+            "details": "Launch the vocab_game project, navigate to progress-related screens, and check for any runtime errors or issues related to progress data handling. Ensure console logs are clear of errors.",
+            "status": "pending",
+            "testStrategy": "Verify that progress loading works via ProgressScreen.gd without calling the removed function. Run progress view tests."
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Verify MockBackend Removal from Autoload",
+        "description": "Ensure MockBackend is completely removed from the [autoload] section in project.godot.",
+        "details": "Open vocab_game/project.godot and check the [autoload] section. Remove any entry for MockBackend if present.",
+        "testStrategy": "Run the project and confirm no autoload errors related to MockBackend. Check project settings for autoloads.",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Locate the project.godot file",
+            "description": "Find and open the vocab_game/project.godot file in the project directory.",
+            "dependencies": [],
+            "details": "Navigate to the vocab_game directory and locate the project.godot file. Ensure you have the necessary permissions to edit it.",
+            "status": "pending",
+            "testStrategy": "Confirm the file is accessible and can be opened in a text editor."
+          },
+          {
+            "id": 2,
+            "title": "Examine the [autoload] section",
+            "description": "Review the [autoload] section within project.godot to identify any entries related to MockBackend.",
+            "dependencies": [
+              1
+            ],
+            "details": "Open project.godot in a text editor and scroll to the [autoload] section. Look for any lines that reference MockBackend, such as autoload entries or paths pointing to it.",
+            "status": "pending",
+            "testStrategy": "Manually inspect the section and note any MockBackend references found."
+          },
+          {
+            "id": 3,
+            "title": "Remove MockBackend entry if present",
+            "description": "Delete any MockBackend autoload entry from the [autoload] section.",
+            "dependencies": [
+              2
+            ],
+            "details": "If a MockBackend entry is found in the [autoload] section, remove the entire line or block associated with it. Ensure no partial references remain.",
+            "status": "pending",
+            "testStrategy": "After removal, re-examine the section to confirm the entry is gone."
+          },
+          {
+            "id": 4,
+            "title": "Save the project.godot file",
+            "description": "Save the changes made to project.godot after removing the MockBackend entry.",
+            "dependencies": [
+              3
+            ],
+            "details": "After editing, save the file using the text editor. Verify that the save operation completes without errors.",
+            "status": "pending",
+            "testStrategy": "Check the file's modification timestamp to ensure it was saved recently."
+          },
+          {
+            "id": 5,
+            "title": "Verify removal by running the project",
+            "description": "Run the project to ensure no autoload errors related to MockBackend occur.",
+            "dependencies": [
+              4
+            ],
+            "details": "Launch the Godot project and monitor the console for any errors mentioning MockBackend. Also, check the project settings under Autoload to confirm MockBackend is not listed.",
+            "status": "pending",
+            "testStrategy": "Run the project and observe that it starts without MockBackend-related autoload issues. If errors appear, revert and recheck the file."
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Add Loading Overlay to Game Session Scene",
+        "description": "Add a ColorRect node as a transparent overlay/spinner in GameSession.tscn for loading states.",
+        "details": "In vocab_game/scenes/GameSession.tscn, add a ColorRect child node named LoadingOverlay with a semi-transparent color and optionally a spinner animation. Position it to cover the UI during loading.",
+        "testStrategy": "Trigger a loading state and visually confirm the overlay appears and disappears correctly.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Open GameSession.tscn in Godot Editor",
+            "description": "Launch the Godot editor and open the vocab_game/scenes/GameSession.tscn file to prepare for modifications.",
+            "dependencies": [],
+            "details": "Ensure the Godot project is loaded, navigate to the scenes folder, and double-click GameSession.tscn to open it in the scene editor.",
+            "status": "pending",
+            "testStrategy": null
+          },
+          {
+            "id": 2,
+            "title": "Add ColorRect Node as Child",
+            "description": "Create a new ColorRect node as a child of the root node in GameSession.tscn and name it LoadingOverlay.",
+            "dependencies": [
+              1
+            ],
+            "details": "In the scene tree, right-click the root node, select 'Add Child Node', choose ColorRect, and rename it to LoadingOverlay in the inspector.",
+            "status": "pending",
+            "testStrategy": null
+          },
+          {
+            "id": 3,
+            "title": "Configure ColorRect Properties",
+            "description": "Set the ColorRect's color to a semi-transparent black or gray to create an overlay effect.",
+            "dependencies": [
+              2
+            ],
+            "details": "In the inspector for LoadingOverlay, set the Color property to something like rgba(0,0,0,0.5) for semi-transparency, and adjust size if needed to cover the screen.",
+            "status": "pending",
+            "testStrategy": null
+          },
+          {
+            "id": 4,
+            "title": "Position LoadingOverlay to Cover UI",
+            "description": "Adjust the position and size of LoadingOverlay to ensure it covers the entire UI area during loading states.",
+            "dependencies": [
+              3
+            ],
+            "details": "Use the layout tools or set anchors and margins in the inspector to make LoadingOverlay full-screen or cover the relevant UI elements, ensuring it's initially hidden.",
+            "status": "pending",
+            "testStrategy": null
+          },
+          {
+            "id": 5,
+            "title": "Add Optional Spinner Animation",
+            "description": "Optionally add a spinning animation to the LoadingOverlay for better user feedback during loading.",
+            "dependencies": [
+              4
+            ],
+            "details": "Add a TextureRect or AnimatedSprite as a child of LoadingOverlay, import a spinner texture, and set up a rotation animation using AnimationPlayer if desired.",
+            "status": "pending",
+            "testStrategy": "Visually inspect the overlay in the editor and test showing/hiding it via script to confirm appearance."
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Connect Loading Signals in Game Session Script",
+        "description": "Update GameSession.gd to connect to SessionManager's loading_started and loading_ended signals to show/hide the overlay.",
+        "details": "In vocab_game/scripts/GameSession.gd, in _ready and _on_activity_changed, connect to SessionManager.loading_started to show LoadingOverlay and loading_ended to hide it.",
+        "testStrategy": "Simulate API calls and verify overlay visibility during loading periods.",
+        "priority": "medium",
+        "dependencies": [
+          6
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Connect Loading Signals in GameSession.gd for Overlay Control",
+            "description": "Update GameSession.gd to connect SessionManager's loading_started and loading_ended signals in both _ready and _on_activity_changed functions to show and hide the LoadingOverlay accordingly.",
+            "dependencies": [
+              6
+            ],
+            "details": "In vocab_game/scripts/GameSession.gd, within the _ready() function, add connections to SessionManager.loading_started to call a method that shows the LoadingOverlay, and to loading_ended to hide it. Similarly, in the _on_activity_changed() function, ensure these connections are established to handle overlay visibility during activity changes. Ensure the overlay is properly referenced and methods are implemented if not already present.",
+            "status": "pending",
+            "testStrategy": "Simulate API calls to trigger loading states and verify that the LoadingOverlay appears on loading_started and disappears on loading_ended in both initialization and activity change scenarios."
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Disable Inputs During Loading in Activity Scripts",
+        "description": "Connect to SessionManager.loading_started in activity scripts to disable input fields and submit buttons.",
+        "details": "In vocab_game/scripts/activities/*.gd, in _ready or similar, connect to loading_started to disable answer_input and submit_button, and re-enable on loading_ended.",
+        "testStrategy": "During loading, attempt to interact with inputs and confirm they are disabled. Re-enable after loading ends.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Disable Inputs During Loading in Multiple Choice Activity",
+            "description": "Update multiple_choice_activity.gd to connect to SessionManager.loading_started signal to disable answer_input and submit_button, and re-enable on loading_ended.",
+            "dependencies": [],
+            "details": "In vocab_game/scripts/activities/multiple_choice_activity.gd, in the _ready() function or similar initialization method, connect to SessionManager.loading_started to disable the answer_input and submit_button nodes, and connect to loading_ended to re-enable them. Ensure the connections are properly set up to handle loading states.",
+            "status": "pending",
+            "testStrategy": "During a loading period, attempt to interact with the input fields and submit button in the multiple choice activity and confirm they are disabled. Verify re-enabling after loading ends."
+          },
+          {
+            "id": 2,
+            "title": "Disable Inputs During Loading in Synonym Antonym Activity",
+            "description": "Update synonym_antonym_activity.gd to connect to SessionManager.loading_started signal to disable answer_input and submit_button, and re-enable on loading_ended.",
+            "dependencies": [],
+            "details": "In vocab_game/scripts/activities/synonym_antonym_activity.gd, in the _ready() function or similar initialization method, connect to SessionManager.loading_started to disable the answer_input and submit_button nodes, and connect to loading_ended to re-enable them. Ensure the connections are properly set up to handle loading states.",
+            "status": "pending",
+            "testStrategy": "During a loading period, attempt to interact with the input fields and submit button in the synonym antonym activity and confirm they are disabled. Verify re-enabling after loading ends."
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Conduct Functional Tests",
+        "description": "Perform happy path tests including start flow, activity flow, data consistency, and progress loading.",
+        "details": "Follow the checklist: Test starting session, completing activities, verifying data, and progress screen. Use real API data.",
+        "testStrategy": "Manually run through each test case, logging results. Ensure no mock data is used and all flows work end-to-end.",
+        "priority": "high",
+        "dependencies": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Test Start Flow",
+            "description": "Perform happy path testing for the start flow, including initiating a session and verifying initial setup.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "details": "Manually start a new session using real API data, ensure the session initializes correctly without errors, and log the results to confirm the flow works end-to-end.",
+            "status": "pending",
+            "testStrategy": "Manually run through the start flow test case, logging results and ensuring no mock data is used."
+          },
+          {
+            "id": 2,
+            "title": "Test Activity Flow",
+            "description": "Conduct happy path tests for the activity flow, covering completion of activities within the session.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "details": "Manually complete various activities in the session using real API data, verify each activity progresses correctly, and log outcomes to ensure smooth end-to-end functionality.",
+            "status": "pending",
+            "testStrategy": "Manually run through the activity flow test case, logging results and ensuring no mock data is used."
+          },
+          {
+            "id": 3,
+            "title": "Test Data Consistency and Progress Loading",
+            "description": "Perform happy path tests for data consistency across the session and progress loading functionality.",
+            "dependencies": [
+              1,
+              2,
+              3,
+              4,
+              5
+            ],
+            "details": "Manually verify data remains consistent throughout the session, test the progress screen loading with real API data, and log results to confirm accurate data handling and progress display.",
+            "status": "pending",
+            "testStrategy": "Manually run through the data consistency and progress loading test cases, logging results and ensuring no mock data is used."
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Conduct Error Path Tests",
+        "description": "Test robustness with network errors, invalid session IDs, and timeouts.",
+        "details": "Simulate failures: Block API URL, use invalid session_id, induce timeouts. Verify error signals and user-friendly messages.",
+        "testStrategy": "Use network tools to simulate errors. Confirm loading_ended fires and api_error shows appropriate messages without freezing.",
+        "priority": "high",
+        "dependencies": [
+          7,
+          8
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Test Network Error Handling",
+            "description": "Simulate network failures to ensure the application handles connectivity issues gracefully.",
+            "dependencies": [],
+            "details": "Use network tools to block the API URL and verify that error signals are fired, displaying user-friendly messages without causing the app to freeze.",
+            "status": "pending",
+            "testStrategy": "Block API URL using tools like firewall rules or proxy, then confirm api_error signals and loading_ended events occur appropriately."
+          },
+          {
+            "id": 2,
+            "title": "Test Invalid Session ID Handling",
+            "description": "Verify behavior when an invalid session ID is provided, ensuring proper error responses.",
+            "dependencies": [],
+            "details": "Modify the session_id to an invalid value and test that the system detects this, triggers error signals, and shows appropriate user-friendly messages.",
+            "status": "pending",
+            "testStrategy": "Use invalid session_id in API calls, check for api_error signals, and ensure no freezing or incorrect data loading."
+          },
+          {
+            "id": 3,
+            "title": "Test Timeout Handling",
+            "description": "Induce timeouts in API requests to test robustness against delays.",
+            "dependencies": [],
+            "details": "Set up scenarios where API calls timeout, then verify that the application handles this by firing error signals and displaying messages without hanging.",
+            "status": "pending",
+            "testStrategy": "Induce timeouts via network simulation tools, monitor for loading_ended and api_error signals, and confirm user-friendly error messages appear."
+          }
+        ]
+      },
+      {
+        "id": 11,
+        "title": "Update Documentation",
+        "description": "Update README.md and QUICKSTART.md to reference PlaycademySdk and real backend instead of MockBackend.",
+        "details": "Edit vocab_game/README.md and QUICKSTART.md to remove MockBackend references and add instructions for Playcademy integration.",
+        "testStrategy": "Review updated docs for accuracy and completeness. Ensure new users can follow for real backend setup.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Update README.md to Reference PlaycademySdk and Real Backend",
+            "description": "Edit vocab_game/README.md to remove all MockBackend references and add instructions for integrating with PlaycademySdk and the real backend.",
+            "dependencies": [],
+            "details": "Locate vocab_game/README.md, search for and remove any mentions of MockBackend. Add sections explaining how to set up and use PlaycademySdk for backend integration, including API endpoints and authentication steps. Ensure the document guides users on replacing mock data with real data sources.",
+            "status": "pending",
+            "testStrategy": "Review the updated README.md for accuracy, completeness, and clarity. Verify that new users can follow the instructions to set up the real backend without confusion."
+          },
+          {
+            "id": 2,
+            "title": "Update QUICKSTART.md to Reference PlaycademySdk and Real Backend",
+            "description": "Edit QUICKSTART.md to remove MockBackend references and include quick instructions for Playcademy integration.",
+            "dependencies": [],
+            "details": "Open QUICKSTART.md, identify and eliminate all references to MockBackend. Incorporate concise steps for integrating PlaycademySdk, such as importing the SDK, configuring backend connections, and running the game with real data. Keep the guide brief and focused on getting started quickly.",
+            "status": "pending",
+            "testStrategy": "Review the updated QUICKSTART.md for accuracy and completeness. Ensure the quickstart instructions allow new users to successfully integrate and run the game with the real backend."
+          }
+        ]
+      },
+      {
+        "id": 12,
+        "title": "Prepare Feedback Report",
+        "description": "Create a feedback report using the playcademy-implementation-checklist.md template.",
+        "details": "Compile the report in .taskmaster/docs/playcademy-implementation-checklist.md, summarizing implementation, tests, and any issues.",
+        "testStrategy": "Validate report against checklist items. Ensure it covers all phases.",
+        "priority": "medium",
+        "dependencies": [
+          9,
+          10
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Compile Feedback Report Sections",
+            "description": "Compile the feedback report by summarizing implementation details, test results, and any identified issues using the playcademy-implementation-checklist.md template.",
+            "dependencies": [],
+            "details": "Review the checklist template in .taskmaster/docs/playcademy-implementation-checklist.md. Gather data from completed tasks (dependencies 9 and 10). Summarize implementation phases, test outcomes, and issues in the report. Ensure the report covers all required sections accurately.",
+            "status": "pending",
+            "testStrategy": "Validate the compiled report against the checklist items to ensure completeness and accuracy. Cross-check summaries with actual implementation and test logs."
+          }
+        ]
+      },
+      {
+        "id": 13,
+        "title": "Update Export Presets for Deployment",
+        "description": "Modify export_presets.cfg to include Playcademy HTML shell for web export.",
+        "details": "In vocab_game/export_presets.cfg, add html/custom_html_shell=\"res://addons/playcademy/shell.html\" under [preset.0.options].",
+        "testStrategy": "Attempt an export and verify the custom shell is applied correctly in the output.",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Locate the export_presets.cfg file in the project",
+            "description": "Find and identify the vocab_game/export_presets.cfg file in the project directory to prepare for editing.",
+            "dependencies": [],
+            "details": "Navigate to the vocab_game directory and confirm the presence of export_presets.cfg. Ensure you have read/write permissions for the file.",
+            "status": "pending",
+            "testStrategy": "Verify the file exists and is accessible by opening it in a text editor."
+          },
+          {
+            "id": 2,
+            "title": "Backup the original export_presets.cfg file",
+            "description": "Create a copy of the original export_presets.cfg to prevent data loss in case of errors.",
+            "dependencies": [
+              1
+            ],
+            "details": "Make a duplicate of vocab_game/export_presets.cfg, naming it something like export_presets.cfg.backup, and store it in a safe location.",
+            "status": "pending",
+            "testStrategy": "Check that the backup file exists and contains the same content as the original."
+          },
+          {
+            "id": 3,
+            "title": "Edit the [preset.0.options] section to add custom HTML shell",
+            "description": "Open export_presets.cfg and add the specified line under [preset.0.options].",
+            "dependencies": [
+              2
+            ],
+            "details": "Using a text editor, locate the [preset.0.options] section in vocab_game/export_presets.cfg and insert the line: html/custom_html_shell=\"res://addons/playcademy/shell.html\". Ensure proper formatting and indentation.",
+            "status": "pending",
+            "testStrategy": "Review the edited file to confirm the line is added correctly without syntax errors."
+          },
+          {
+            "id": 4,
+            "title": "Save and validate the changes in export_presets.cfg",
+            "description": "Save the modified file and check for any configuration errors.",
+            "dependencies": [
+              3
+            ],
+            "details": "Save the changes to vocab_game/export_presets.cfg and validate the file by attempting to load it in the Godot editor or checking for parsing errors.",
+            "status": "pending",
+            "testStrategy": "Open the project in Godot and ensure the export presets load without errors."
+          },
+          {
+            "id": 5,
+            "title": "Test the export with the new custom HTML shell",
+            "description": "Perform an export attempt to verify the custom shell is applied correctly.",
+            "dependencies": [
+              4
+            ],
+            "details": "In Godot, attempt to export the project for web using the updated preset. Check the exported files to confirm the custom HTML shell is included.",
+            "status": "pending",
+            "testStrategy": "Examine the exported HTML file to ensure it references the custom shell path and functions as expected."
+          }
+        ]
+      },
+      {
+        "id": 14,
+        "title": "Execute CLI Deployment",
+        "description": "Run the playcademy deploy command to finalize deployment.",
+        "details": "Ensure all prerequisites are met, then execute playcademy deploy from the CLI.",
+        "testStrategy": "Monitor deployment logs for success. Test the deployed version for functionality.",
+        "priority": "low",
+        "dependencies": [
+          12,
+          13
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Verify Prerequisites for Deployment",
+            "description": "Check that all necessary conditions and dependencies are satisfied before proceeding with the deployment.",
+            "dependencies": [],
+            "details": "Review tasks 12 and 13 to ensure the feedback report is prepared and export presets are updated. Confirm that the project is ready for deployment by checking for any outstanding issues or errors in the project setup.",
+            "status": "pending",
+            "testStrategy": "Manually inspect the project files and logs to confirm prerequisites are met."
+          },
+          {
+            "id": 2,
+            "title": "Set Up CLI Environment",
+            "description": "Prepare the command-line interface environment for executing the deployment command.",
+            "dependencies": [
+              1
+            ],
+            "details": "Navigate to the project root directory in the terminal. Ensure that the playcademy CLI tool is installed and accessible. Verify that the user has the necessary permissions to run deployment commands.",
+            "status": "pending",
+            "testStrategy": "Run a test command to confirm the CLI is functioning and the environment is set up correctly."
+          },
+          {
+            "id": 3,
+            "title": "Execute Playcademy Deploy Command",
+            "description": "Run the specific CLI command to initiate the deployment process.",
+            "dependencies": [
+              2
+            ],
+            "details": "In the terminal, execute the command 'playcademy deploy' from the project root directory. Monitor the initial output for any immediate errors or confirmations that the deployment has started.",
+            "status": "pending",
+            "testStrategy": "Check the command output for success messages or errors indicating the deployment initiation."
+          },
+          {
+            "id": 4,
+            "title": "Monitor Deployment Logs",
+            "description": "Observe the deployment logs to ensure the process completes successfully.",
+            "dependencies": [
+              3
+            ],
+            "details": "Keep the terminal open and watch the logs generated during the deployment. Look for progress indicators, warnings, or errors. Note any issues that arise for potential troubleshooting.",
+            "status": "pending",
+            "testStrategy": "Review the logs post-deployment to verify no critical errors occurred and that the process finished as expected."
+          },
+          {
+            "id": 5,
+            "title": "Test Deployed Version",
+            "description": "Verify that the deployed application is functioning correctly.",
+            "dependencies": [
+              4
+            ],
+            "details": "Access the deployed version of the application (e.g., via web URL if applicable). Perform basic functionality tests, such as loading the game, interacting with activities, and checking for any runtime errors.",
+            "status": "pending",
+            "testStrategy": "Use manual testing to confirm features work as intended, and check browser console or logs for any deployment-related issues."
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "created": "2025-11-07T02:11:02.431Z",
+      "updated": "2025-11-07T02:11:02.431Z",
+      "description": "Tasks for integrate context"
+    }
+  }
+}

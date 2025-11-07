@@ -1,0 +1,125 @@
+{
+	"meta": {
+		"generatedAt": "2025-11-07T02:20:31.517Z",
+		"tasksAnalyzed": 14,
+		"totalTasks": 14,
+		"analysisCount": 14,
+		"thresholdScore": 5,
+		"projectName": "Taskmaster",
+		"usedResearch": false
+	},
+	"complexityAnalysis": [
+		{
+			"taskId": 1,
+			"taskTitle": "Remove MockBackend References from Multiple Choice Activity",
+			"complexityScore": 2,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "",
+			"reasoning": "This task involves simple code removal in a single file, with minimal technical challenges, dependencies, or testing effort beyond basic verification."
+		},
+		{
+			"taskId": 2,
+			"taskTitle": "Remove MockBackend Logic from Synonym Antonym Activity",
+			"complexityScore": 3,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "",
+			"reasoning": "Similar to task 1, it requires updating logic in one file but involves modifying two functions, slightly increasing effort and testing for both synonym and antonym modes."
+		},
+		{
+			"taskId": 3,
+			"taskTitle": "Update Activity Controller to Remove MockBackend Calls",
+			"complexityScore": 4,
+			"recommendedSubtasks": 1,
+			"expansionPrompt": "Break this task into subtasks for updating each function (_on_answer_submitted, _ready, update_progress_display) and adding signal connections.",
+			"reasoning": "Involves changes across multiple functions in one file, adding signal connections, and ensuring integration with SessionManager, requiring moderate testing for signal handling and progress updates."
+		},
+		{
+			"taskId": 4,
+			"taskTitle": "Remove get_progress_data from Session Manager",
+			"complexityScore": 2,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "",
+			"reasoning": "Straightforward deletion of a function from one file, with low effort and dependencies, focused on ensuring progress still works via another component."
+		},
+		{
+			"taskId": 5,
+			"taskTitle": "Verify MockBackend Removal from Autoload",
+			"complexityScore": 2,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "",
+			"reasoning": "Simple configuration edit in project.godot, with quick verification through project run, minimal technical challenges."
+		},
+		{
+			"taskId": 6,
+			"taskTitle": "Add Loading Overlay to Game Session Scene",
+			"complexityScore": 3,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "",
+			"reasoning": "UI addition in a scene file, involving node creation and positioning, with moderate effort for visual design and basic testing."
+		},
+		{
+			"taskId": 7,
+			"taskTitle": "Connect Loading Signals in Game Session Script",
+			"complexityScore": 4,
+			"recommendedSubtasks": 1,
+			"expansionPrompt": "Break this task into subtasks for connecting signals in _ready and _on_activity_changed functions.",
+			"reasoning": "Code changes in one script to connect signals and control overlay visibility, dependent on task 6, with testing requiring simulation of loading states."
+		},
+		{
+			"taskId": 8,
+			"taskTitle": "Disable Inputs During Loading in Activity Scripts",
+			"complexityScore": 5,
+			"recommendedSubtasks": 2,
+			"expansionPrompt": "Break this task into subtasks for each activity script file (e.g., multiple_choice_activity.gd, synonym_antonym_activity.gd, etc.) to add signal connections and input disabling logic.",
+			"reasoning": "Affects multiple activity scripts, requiring consistent changes across files, with testing for input disabling during loading periods, increasing complexity due to breadth."
+		},
+		{
+			"taskId": 9,
+			"taskTitle": "Conduct Functional Tests",
+			"complexityScore": 7,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break this task into subtasks for each test category: start flow, activity flow, data consistency, and progress loading.",
+			"reasoning": "Comprehensive end-to-end testing with real API data, high effort in manual execution and logging, dependent on prior code changes, with potential for issues across multiple components."
+		},
+		{
+			"taskId": 10,
+			"taskTitle": "Conduct Error Path Tests",
+			"complexityScore": 8,
+			"recommendedSubtasks": 3,
+			"expansionPrompt": "Break this task into subtasks for each error scenario: network errors, invalid session IDs, and timeouts.",
+			"reasoning": "Involves simulating failures using tools, testing robustness and error handling, dependent on loading signals, with high testing effort and technical challenges in setup."
+		},
+		{
+			"taskId": 11,
+			"taskTitle": "Update Documentation",
+			"complexityScore": 3,
+			"recommendedSubtasks": 1,
+			"expansionPrompt": "Break this task into subtasks for updating each document (README.md and QUICKSTART.md).",
+			"reasoning": "Editing two markdown files to update references, moderate effort in ensuring accuracy and completeness, with review-based testing."
+		},
+		{
+			"taskId": 12,
+			"taskTitle": "Prepare Feedback Report",
+			"complexityScore": 4,
+			"recommendedSubtasks": 1,
+			"expansionPrompt": "Break this task into subtasks for compiling sections of the report based on the checklist template.",
+			"reasoning": "Compiling a report from tests and implementation, dependent on testing tasks, with effort in summarization and validation."
+		},
+		{
+			"taskId": 13,
+			"taskTitle": "Update Export Presets for Deployment",
+			"complexityScore": 2,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "",
+			"reasoning": "Simple configuration edit in export_presets.cfg, with quick verification through export attempt, low technical challenges."
+		},
+		{
+			"taskId": 14,
+			"taskTitle": "Execute CLI Deployment",
+			"complexityScore": 3,
+			"recommendedSubtasks": 0,
+			"expansionPrompt": "",
+			"reasoning": "Running a CLI command after prerequisites, with testing via logs and deployed version, low effort but dependent on prior tasks."
+		}
+	]
+}

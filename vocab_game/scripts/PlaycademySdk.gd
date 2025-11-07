@@ -124,23 +124,27 @@ func _ready():
 	user_id = Config.get_user_id()
 	password = Config.get_password()
 
-	print("PlaycademySDK initialized")
-	print("Backend URL: ", base_url)
-	print("User ID: ", user_id)
+	Logger.info("PlaycademySDK initialized", "PlaycademySdk")
+	Logger.info("Backend URL: " + base_url, "PlaycademySdk")
+	Logger.debug("User ID: " + user_id, "PlaycademySdk")
 
-	# Load persisted session cookie if available
-	_load_session_cookie()
+	# Try to load and validate persisted session
+	var session_loaded = await _load_and_validate_session()
 
-	# Perform login to get session cookie if auto-login is enabled
-	if Config.should_auto_login():
+	# If session validation failed or no session, perform login if auto-login enabled
+	if not session_loaded and Config.should_auto_login():
 		await login()
+	elif session_loaded:
+		is_ready = true
+		sdk_ready.emit()
+		Logger.info("SDK Ready (using persisted session)", "PlaycademySdk")
 	else:
 		is_ready = true
 		sdk_ready.emit()
-		print("SDK Ready (manual login required)")
+		Logger.info("SDK Ready (manual login required)", "PlaycademySdk")
 
 func login() -> bool:
-	print("Logging in as: ", user_id)
+	Logger.info("Attempting login as: " + user_id, "PlaycademySdk")
 
 	var response = await backend.request("POST", "/auth/sign-in/email", {
 		"email": user_id,
@@ -148,50 +152,100 @@ func login() -> bool:
 	})
 
 	if response.has("error"):
-		push_error("Login failed: ", str(response.error))
+		Logger.error("Login failed: " + str(response.error), "PlaycademySdk")
 		return false
 
-	print("Login successful!")
+	Logger.info("Login successful!", "PlaycademySdk")
 	is_ready = true
 
-	# Persist session cookie to file
-	_save_session_cookie()
+	# Persist session cookie to file (with error handling)
+	if not _save_session_cookie():
+		Logger.warn("Failed to persist session cookie - will need to login again on restart", "PlaycademySdk")
 
 	sdk_ready.emit()
-	print("SDK Ready!")
+	Logger.info("SDK Ready!", "PlaycademySdk")
 	return true
 
-func _load_session_cookie():
-	"""Load persisted session cookie from file storage"""
+func _load_and_validate_session() -> bool:
+	"""Load persisted session and validate it's still active"""
 	if not FileAccess.file_exists(SESSION_FILE_PATH):
-		return
+		return false
 
 	var file = FileAccess.open(SESSION_FILE_PATH, FileAccess.READ)
 	if not file:
-		push_warning("Failed to load session cookie")
-		return
+		Logger.warn("Failed to open session file", "PlaycademySdk")
+		return false
 
-	session_cookie = file.get_line()
+	# Read and decode session cookie
+	var encoded_cookie = file.get_line()
 	file.close()
 
-	if session_cookie != "":
-		print("Loaded persisted session cookie")
+	if encoded_cookie == "":
+		return false
 
-func _save_session_cookie():
-	"""Save session cookie to file storage for persistence"""
+	# Simple XOR obfuscation (not encryption, but better than plaintext)
+	session_cookie = _decode_session(encoded_cookie)
+
 	if session_cookie == "":
-		return
+		Logger.warn("Failed to decode session cookie", "PlaycademySdk")
+		return false
+
+	Logger.debug("Loaded persisted session cookie", "PlaycademySdk")
+
+	# Validate session by making a test request
+	var test_response = await backend.request("GET", "/auth/session", {})
+
+	if test_response.has("error"):
+		Logger.warn("Persisted session is invalid or expired, clearing it", "PlaycademySdk")
+		clear_session()
+		return false
+
+	Logger.info("Persisted session validated successfully", "PlaycademySdk")
+	return true
+
+func _save_session_cookie() -> bool:
+	"""Save session cookie to file storage with basic obfuscation"""
+	if session_cookie == "":
+		Logger.warn("Attempted to save empty session cookie", "PlaycademySdk")
+		return false
 
 	var file = FileAccess.open(SESSION_FILE_PATH, FileAccess.WRITE)
 	if not file:
-		push_warning("Failed to save session cookie")
-		return
+		Logger.error("Failed to open session file for writing", "PlaycademySdk")
+		return false
 
-	file.store_line(session_cookie)
+	# Simple XOR obfuscation (better than plaintext, though not true encryption)
+	var encoded_cookie = _encode_session(session_cookie)
+	file.store_line(encoded_cookie)
 	file.close()
 
-	if Config.is_debug_mode():
-		print("Saved session cookie to file")
+	Logger.debug("Saved session cookie to file", "PlaycademySdk")
+	return true
+
+func _encode_session(text: String) -> String:
+	"""Simple XOR obfuscation (not secure encryption, just obfuscation)"""
+	var key = "PlaycademyVocabGame2025"  # Simple XOR key
+	var result = PackedByteArray()
+	var text_bytes = text.to_utf8_buffer()
+
+	for i in range(text_bytes.size()):
+		result.append(text_bytes[i] ^ key.unicode_at(i % key.length()))
+
+	return Marshalls.raw_to_base64(result)
+
+func _decode_session(encoded: String) -> String:
+	"""Decode XOR obfuscated session"""
+	var key = "PlaycademyVocabGame2025"
+	var decoded_bytes = Marshalls.base64_to_raw(encoded)
+
+	if decoded_bytes.size() == 0:
+		return ""
+
+	var result = PackedByteArray()
+	for i in range(decoded_bytes.size()):
+		result.append(decoded_bytes[i] ^ key.unicode_at(i % key.length()))
+
+	return result.get_string_from_utf8()
 
 func clear_session():
 	"""Clear current session and delete persisted cookie"""
@@ -201,4 +255,6 @@ func clear_session():
 	# Delete session file
 	if FileAccess.file_exists(SESSION_FILE_PATH):
 		DirAccess.remove_absolute(SESSION_FILE_PATH)
-		print("Cleared session cookie")
+		Logger.info("Cleared session cookie and file", "PlaycademySdk")
+	else:
+		Logger.debug("No session file to clear", "PlaycademySdk")

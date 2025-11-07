@@ -15,6 +15,9 @@ var current_level: LogLevel = LogLevel.INFO
 var log_to_file: bool = false
 var log_file_path: String = "user://game.log"
 var log_file: FileAccess = null
+var log_buffer: Array[String] = []  # Buffer logs before flushing
+const FLUSH_THRESHOLD = 10  # Flush every 10 log entries
+const MAX_LOG_SIZE = 1024 * 1024  # 1MB max log file size
 
 # Color codes for terminal output (if supported)
 const COLOR_DEBUG = "\u001b[36m"   # Cyan
@@ -25,17 +28,24 @@ const COLOR_RESET = "\u001b[0m"
 
 func _ready():
 	# Load log level from config
-	var level_str = Config.get_log_level() if Config else "INFO"
-	current_level = _parse_log_level(level_str)
+	if not Config:
+		push_error("Config not available! Logger falling back to INFO level")
+		current_level = LogLevel.INFO
+	else:
+		var level_str = Config.get_log_level()
+		current_level = _parse_log_level(level_str)
 
 	# Enable file logging in production builds
 	if not OS.is_debug_build():
 		log_to_file = true
+		_rotate_log_if_needed()
 		_open_log_file()
 
 	info("Logger initialized with level: " + _level_to_string(current_level))
 
 func _exit_tree():
+	# Flush remaining logs before closing
+	_flush_log_buffer()
 	if log_file:
 		log_file.close()
 
@@ -71,10 +81,13 @@ func _log(level: LogLevel, message: String, context: String = ""):
 		LogLevel.WARN:
 			push_warning(message)
 
-	# Write to file if enabled
+	# Write to file if enabled (buffered for performance)
 	if log_to_file and log_file:
-		log_file.store_line(log_message)
-		log_file.flush()  # Ensure it's written immediately
+		log_buffer.append(log_message)
+
+		# Flush on ERROR level or when buffer is full
+		if level == LogLevel.ERROR or log_buffer.size() >= FLUSH_THRESHOLD:
+			_flush_log_buffer()
 
 func _parse_log_level(level_str: String) -> LogLevel:
 	match level_str.to_upper():
@@ -153,6 +166,8 @@ func get_log_file_contents() -> String:
 
 func clear_log_file():
 	"""Clear the log file"""
+	_flush_log_buffer()
+
 	if log_file:
 		log_file.close()
 
@@ -161,3 +176,38 @@ func clear_log_file():
 
 	if log_to_file:
 		_open_log_file()
+
+func _flush_log_buffer():
+	"""Flush buffered log entries to file"""
+	if not log_file or log_buffer.is_empty():
+		return
+
+	for entry in log_buffer:
+		log_file.store_line(entry)
+
+	log_file.flush()
+	log_buffer.clear()
+
+func _rotate_log_if_needed():
+	"""Rotate log file if it exceeds max size"""
+	if not FileAccess.file_exists(log_file_path):
+		return
+
+	var file = FileAccess.open(log_file_path, FileAccess.READ)
+	if not file:
+		return
+
+	var file_size = file.get_length()
+	file.close()
+
+	if file_size > MAX_LOG_SIZE:
+		# Rename current log to .old
+		var old_log_path = log_file_path + ".old"
+
+		# Delete existing .old file if present
+		if FileAccess.file_exists(old_log_path):
+			DirAccess.remove_absolute(old_log_path)
+
+		# Rename current to .old
+		DirAccess.rename_absolute(log_file_path, old_log_path)
+		push_warning("Log file rotated (exceeded " + str(MAX_LOG_SIZE / 1024) + "KB)")

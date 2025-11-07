@@ -8,12 +8,15 @@ extends Node
 var config = {
 	"backend_url": "http://localhost:8788/api",
 	"user_id": "student.fresh@demo.playcademy.com",
-	"password": "password",
+	"password": "password",  # WARNING: Storing passwords is a security risk! Use secure auth in production
 	"auto_login": true,
 	"debug_mode": true,
 	"enable_audio": true,
 	"log_level": "INFO"  # DEBUG, INFO, WARN, ERROR
 }
+
+# Valid log levels
+const VALID_LOG_LEVELS = ["DEBUG", "INFO", "WARN", "WARNING", "ERROR", "NONE"]
 
 # Config file path
 const CONFIG_FILE_PATH = "res://config.json"
@@ -30,23 +33,24 @@ func load_config():
 	if FileAccess.file_exists(USER_CONFIG_PATH):
 		loaded = _load_from_file(USER_CONFIG_PATH)
 		if loaded:
-			print("Config: Loaded from user directory")
+			push_warning("Config: Loaded from user directory")  # Use push_warning since Logger not ready yet
 
 	# Fall back to res:// directory (read-only, bundled with game)
 	if not loaded and FileAccess.file_exists(CONFIG_FILE_PATH):
 		loaded = _load_from_file(CONFIG_FILE_PATH)
 		if loaded:
-			print("Config: Loaded from resource directory")
+			push_warning("Config: Loaded from resource directory")  # Use push_warning since Logger not ready yet
 
 	if not loaded:
-		print("Config: Using default values (no config file found)")
+		push_warning("Config: Using default values (no config file found)")  # Use push_warning since Logger not ready yet
 
 	# Log configuration (hide sensitive data in production)
+	# Note: Can't use Logger here as it depends on Config being ready first
 	if config.debug_mode:
-		print("Config: Backend URL: ", config.backend_url)
-		print("Config: User ID: ", config.user_id)
-		print("Config: Auto Login: ", config.auto_login)
-		print("Config: Debug Mode: ", config.debug_mode)
+		push_warning("Config: Backend URL: " + config.backend_url)
+		push_warning("Config: User ID: " + config.user_id)
+		push_warning("Config: Auto Login: " + str(config.auto_login))
+		push_warning("Config: Debug Mode: " + str(config.debug_mode))
 
 func _load_from_file(file_path: String) -> bool:
 	"""Load configuration from a JSON file"""
@@ -74,7 +78,39 @@ func _load_from_file(file_path: String) -> bool:
 	for key in loaded_config:
 		config[key] = loaded_config[key]
 
+	# Validate critical configuration values
+	_validate_config()
+
 	return true
+
+func _validate_config():
+	"""Validate configuration values and fix or warn about issues"""
+	# Validate backend URL
+	if not config.backend_url.begins_with("http://") and not config.backend_url.begins_with("https://"):
+		push_warning("Invalid backend_url: must start with http:// or https://")
+		config.backend_url = "http://localhost:8788/api"
+
+	# Validate log level
+	if not config.log_level.to_upper() in VALID_LOG_LEVELS:
+		push_warning("Invalid log_level: '" + config.log_level + "', defaulting to INFO")
+		config.log_level = "INFO"
+
+	# Warn about password storage
+	if config.has("password") and config.password != "":
+		push_warning("SECURITY WARNING: Storing passwords in config is not recommended for production!")
+
+	# Validate boolean values
+	if typeof(config.auto_login) != TYPE_BOOL:
+		push_warning("auto_login should be a boolean, converting")
+		config.auto_login = bool(config.auto_login)
+
+	if typeof(config.debug_mode) != TYPE_BOOL:
+		push_warning("debug_mode should be a boolean, converting")
+		config.debug_mode = bool(config.debug_mode)
+
+	if typeof(config.enable_audio) != TYPE_BOOL:
+		push_warning("enable_audio should be a boolean, converting")
+		config.enable_audio = bool(config.enable_audio)
 
 func get_value(key: String, default = null):
 	"""Get a configuration value by key"""
@@ -97,7 +133,8 @@ func save_user_config() -> bool:
 	file.store_string(json_string)
 	file.close()
 
-	print("Config: Saved to user directory")
+	if Logger:
+		Logger.info("Config saved to user directory", "Config")
 	return true
 
 func get_backend_url() -> String:

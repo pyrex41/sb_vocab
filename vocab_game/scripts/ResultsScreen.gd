@@ -1,10 +1,25 @@
 extends Control
 
+# Animation constants
+const TITLE_BOUNCE_DURATION = 0.6
+const LABEL_FADE_DURATION = 0.4
+const LABEL_FADE_DELAY = 0.2
+const BUTTON_FADE_DURATION = 0.5
+const CONFETTI_PARTICLE_COUNT = 20
+const CONFETTI_MIN_DURATION = 2.0
+const CONFETTI_MAX_DURATION = 3.5
+const CONFETTI_MIN_X_DRIFT = -100
+const CONFETTI_MAX_X_DRIFT = 100
+const CONFETTI_Y_OFFSET = 50
+const CONFETTI_X_MARGIN = 100
+
 @onready var title_label = $CenterContainer/VBoxContainer/TitleLabel
 @onready var activities_label = $CenterContainer/VBoxContainer/ActivitiesLabel
 @onready var words_label = $CenterContainer/VBoxContainer/WordsLabel
 @onready var continue_button = $CenterContainer/VBoxContainer/ContinueButton
 @onready var main_menu_button = $CenterContainer/VBoxContainer/MainMenuButton
+
+var active_confetti: Array[Label] = []
 
 func _ready():
 	continue_button.pressed.connect(_on_continue_pressed)
@@ -62,25 +77,32 @@ func _animate_entrance():
 	var title_tween = create_tween()
 	title_tween.set_ease(Tween.EASE_OUT)
 	title_tween.set_trans(Tween.TRANS_BACK)
-	title_tween.tween_property(title_label, "scale", Vector2(1, 1), 0.6)
+	title_tween.tween_property(title_label, "scale", Vector2(1, 1), TITLE_BOUNCE_DURATION)
 
 	# Wait a bit, then fade in the stats
 	await title_tween.finished
-	await get_tree().create_timer(0.2).timeout
+	if not is_inside_tree():
+		return
+	await get_tree().create_timer(LABEL_FADE_DELAY).timeout
 
 	# Fade in stats labels one by one
 	var labels = [activities_label, words_label]
 	for label in labels:
+		if not is_inside_tree():
+			return
 		label.modulate.a = 0
 		var tween = create_tween()
-		tween.tween_property(label, "modulate:a", 1.0, 0.4)
-		await get_tree().create_timer(0.2).timeout
+		tween.tween_property(label, "modulate:a", 1.0, LABEL_FADE_DURATION)
+		await get_tree().create_timer(LABEL_FADE_DELAY).timeout
+
+	if not is_inside_tree():
+		return
 
 	# Fade in buttons
 	var button_tween = create_tween()
 	button_tween.set_parallel(true)
-	button_tween.tween_property(continue_button, "modulate:a", 1.0, 0.5)
-	button_tween.tween_property(main_menu_button, "modulate:a", 1.0, 0.5)
+	button_tween.tween_property(continue_button, "modulate:a", 1.0, BUTTON_FADE_DURATION)
+	button_tween.tween_property(main_menu_button, "modulate:a", 1.0, BUTTON_FADE_DURATION)
 
 	# Check if this was a good performance and add celebration
 	var summary = SessionManager.last_session_summary
@@ -96,23 +118,40 @@ func _create_celebration_effect():
 	# Create confetti effect
 	var emojis = ["🎉", "🎊", "⭐", "✨", "🌟", "💫", "🏆", "👏"]
 
-	for i in range(20):
+	for i in range(CONFETTI_PARTICLE_COUNT):
+		if not is_inside_tree():
+			break  # Stop creating confetti if scene is being destroyed
+
 		var label = Label.new()
 		label.text = emojis[i % emojis.size()]
 		label.add_theme_font_size_override("font_size", 40)
 
 		# Random starting position at top of screen
-		label.position = Vector2(randf_range(100, get_viewport_rect().size.x - 100), -50)
+		label.position = Vector2(
+			randf_range(CONFETTI_X_MARGIN, get_viewport_rect().size.x - CONFETTI_X_MARGIN),
+			-CONFETTI_Y_OFFSET
+		)
 		add_child(label)
+		active_confetti.append(label)
 
 		# Animate falling and rotating
-		var duration = randf_range(2.0, 3.5)
+		var duration = randf_range(CONFETTI_MIN_DURATION, CONFETTI_MAX_DURATION)
 		var tween = create_tween()
 		tween.set_parallel(true)
-		tween.tween_property(label, "position:y", get_viewport_rect().size.y + 50, duration)
-		tween.tween_property(label, "position:x", label.position.x + randf_range(-100, 100), duration)
+		tween.tween_property(label, "position:y", get_viewport_rect().size.y + CONFETTI_Y_OFFSET, duration)
+		tween.tween_property(label, "position:x", label.position.x + randf_range(CONFETTI_MIN_X_DRIFT, CONFETTI_MAX_X_DRIFT), duration)
 		tween.tween_property(label, "rotation", randf_range(-PI, PI), duration)
 
-		# Cleanup
-		await get_tree().create_timer(duration).timeout
-		label.queue_free()
+		# Cleanup - only if still valid
+		tween.finished.connect(func():
+			if is_instance_valid(label):
+				active_confetti.erase(label)
+				label.queue_free()
+		)
+
+func _exit_tree():
+	# Clean up any active confetti to prevent memory leaks
+	for label in active_confetti:
+		if is_instance_valid(label):
+			label.queue_free()
+	active_confetti.clear()

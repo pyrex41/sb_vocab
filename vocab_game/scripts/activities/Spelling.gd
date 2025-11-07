@@ -70,20 +70,7 @@ func _submit_answer():
 		_show_validation_error()
 
 func _show_validation_error():
-	# Briefly flash the input field to indicate validation error
-	var original_color = answer_input.modulate
-	answer_input.modulate = Color(1.0, 0.7, 0.7)  # Light red tint
-	await get_tree().create_timer(0.3).timeout
-	answer_input.modulate = original_color
-
-	# Shake animation
-	var original_pos = answer_input.position
-	for i in range(3):
-		answer_input.position.x = original_pos.x - 5
-		await get_tree().create_timer(0.05).timeout
-		answer_input.position.x = original_pos.x + 5
-		await get_tree().create_timer(0.05).timeout
-	answer_input.position = original_pos
+	AnimationHelper.show_validation_error(answer_input)
 
 func _on_loading_started():
 	answer_input.editable = false

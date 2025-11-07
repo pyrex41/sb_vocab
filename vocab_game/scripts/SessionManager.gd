@@ -92,7 +92,7 @@ func _load_next_activity():
 
 	var response = await PlaycademySdk.backend.request(
 		"POST",
-		"/session/" + current_session_id + "/next",
+		"/session/%s/next" % current_session_id,
 		{}
 	)
 
@@ -151,7 +151,7 @@ func submit_answer(answer: String):
 
 	var response = await PlaycademySdk.backend.request(
 		"POST",
-		"/session/" + current_session_id + "/attempt",
+		"/session/%s/attempt" % current_session_id,
 		{
 			"itemId": current_item_id,
 			"answer": answer,

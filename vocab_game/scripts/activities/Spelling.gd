@@ -30,10 +30,6 @@ func setup(activity_data: Dictionary):
 	answer_input.text = ""
 	answer_input.placeholder_text = "Type the word here..."
 
-	# DEBUG: Print the word to console for testing (only in debug builds)
-	if OS.is_debug_build() and word_data.has("word"):
-		print("DEBUG: Spelling word is '%s'" % word_data.word)
-
 	# Auto-play the audio once
 	_play_audio_hint()
 
@@ -44,15 +40,46 @@ func _on_play_audio():
 	_play_audio_hint()
 
 func _play_audio_hint():
-	# In a real implementation, this would play the audio file
-	# For now, just show a hint message
-	instruction_label.text = "🔊 Playing audio... Listen carefully!"
-	if is_inside_tree():
-		await get_tree().create_timer(1.0).timeout
+	# Try to play word pronunciation using available methods
+	if not word_data.has("word"):
+		push_warning("No word data available for audio playback")
+		return
+
+	var word = word_data.word
+
+	# Method 1: Try to play pre-recorded audio file if available
+	var audio_path = "res://audio/words/%s.wav" % word.to_lower()
+	if ResourceLoader.exists(audio_path):
+		instruction_label.text = "🔊 Playing audio... Listen carefully!"
+		var audio_stream = load(audio_path)
+		var player = AudioStreamPlayer.new()
+		add_child(player)
+		player.stream = audio_stream
+		player.play()
+		await player.finished
+		player.queue_free()
 		instruction_label.text = "Type what you heard:"
+		return
+
+	# Method 2: Use text-to-speech if available (fallback)
+	if DisplayServer.tts_is_speaking() or DisplayServer.tts_is_paused():
+		DisplayServer.tts_stop()
+
+	instruction_label.text = "🔊 Speaking word... Listen carefully!"
+	DisplayServer.tts_speak(word, "en", 50, 1.0, 1.0, 0, false)
+
+	# Wait for TTS to finish (estimate based on word length)
+	var estimated_duration = max(1.0, word.length() * 0.15)
+	if is_inside_tree():
+		await get_tree().create_timer(estimated_duration).timeout
 	else:
 		push_warning("Spelling activity not in scene tree, skipping audio hint timer")
-		instruction_label.text = "Type what you heard:"
+
+	instruction_label.text = "Type what you heard:"
+
+	# Debug: Print word in debug builds
+	if Config and Config.is_debug_mode():
+		Logger.debug("Spelling word: " + word, "Spelling")
 
 func _on_submit():
 	_submit_answer()

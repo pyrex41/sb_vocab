@@ -1,0 +1,9 @@
+{
+	"backend_url": "http://localhost:8788/api",
+	"user_id": "student.fresh@demo.playcademy.com",
+	"password": "password",
+	"auto_login": true,
+	"debug_mode": true,
+	"enable_audio": true,
+	"log_level": "INFO"
+}

@@ -17,6 +17,8 @@ config/icon="res://icon.svg"
 
 [autoload]
 
+Config="*res://scripts/Config.gd"
+Logger="*res://scripts/Logger.gd"
 PlaycademySdk="*res://scripts/PlaycademySdk.gd"
 SessionManager="*res://scripts/SessionManager.gd"
 

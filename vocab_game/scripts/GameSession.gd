@@ -80,7 +80,11 @@ func _ready():
 	SessionManager.start_new_session("grade3")
 
 func _on_activity_changed(activity_data: Dictionary, index: int, total: int):
-	progress_label.text = "Activity %d / %d" % [index, total]
+	# Show "Activity X / Y" if total is known, otherwise just "Activity X"
+	if total > 0:
+		progress_label.text = "Activity %d / %d" % [index, total]
+	else:
+		progress_label.text = "Activity %d" % index
 	_load_activity(activity_data)
 
 func _load_activity(activity_data: Dictionary):

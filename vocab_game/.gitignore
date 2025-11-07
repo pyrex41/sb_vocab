@@ -1,0 +1,28 @@
+# Godot-specific ignores
+.import/
+export.cfg
+export_presets.cfg
+
+# Godot 4+ specific
+.godot/
+*.translation
+
+# User-specific files
+config.json
+user://
+
+# Session and log files
+*.log
+session.dat
+
+# OS-specific
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE-specific
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

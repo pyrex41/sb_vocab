@@ -3,10 +3,10 @@ extends Node
 # PlaycademySDK - Handles backend API communication
 # This is a simplified SDK for connecting to the local backend server
 
-# Configuration
-var base_url: String = "http://localhost:8788/api"
-var user_id: String = "student.fresh@demo.playcademy.com"  # Dev mode auto-authenticates as this user
-var password: String = "password"  # Default password for demo users
+# Configuration (loaded from Config autoload)
+var base_url: String = ""
+var user_id: String = ""
+var password: String = ""
 var is_ready: bool = false
 var session_cookie: String = ""  # Stores the authentication cookie
 signal sdk_ready()
@@ -113,14 +113,31 @@ class Backend:
 
 var backend: Backend
 
+# Session persistence
+const SESSION_FILE_PATH = "user://session.dat"
+
 func _ready():
 	backend = Backend.new(self)
+
+	# Load configuration from Config autoload
+	base_url = Config.get_backend_url()
+	user_id = Config.get_user_id()
+	password = Config.get_password()
+
 	print("PlaycademySDK initialized")
 	print("Backend URL: ", base_url)
 	print("User ID: ", user_id)
 
-	# Perform login to get session cookie
-	await login()
+	# Load persisted session cookie if available
+	_load_session_cookie()
+
+	# Perform login to get session cookie if auto-login is enabled
+	if Config.should_auto_login():
+		await login()
+	else:
+		is_ready = true
+		sdk_ready.emit()
+		print("SDK Ready (manual login required)")
 
 func login() -> bool:
 	print("Logging in as: ", user_id)
@@ -136,6 +153,52 @@ func login() -> bool:
 
 	print("Login successful!")
 	is_ready = true
+
+	# Persist session cookie to file
+	_save_session_cookie()
+
 	sdk_ready.emit()
 	print("SDK Ready!")
 	return true
+
+func _load_session_cookie():
+	"""Load persisted session cookie from file storage"""
+	if not FileAccess.file_exists(SESSION_FILE_PATH):
+		return
+
+	var file = FileAccess.open(SESSION_FILE_PATH, FileAccess.READ)
+	if not file:
+		push_warning("Failed to load session cookie")
+		return
+
+	session_cookie = file.get_line()
+	file.close()
+
+	if session_cookie != "":
+		print("Loaded persisted session cookie")
+
+func _save_session_cookie():
+	"""Save session cookie to file storage for persistence"""
+	if session_cookie == "":
+		return
+
+	var file = FileAccess.open(SESSION_FILE_PATH, FileAccess.WRITE)
+	if not file:
+		push_warning("Failed to save session cookie")
+		return
+
+	file.store_line(session_cookie)
+	file.close()
+
+	if Config.is_debug_mode():
+		print("Saved session cookie to file")
+
+func clear_session():
+	"""Clear current session and delete persisted cookie"""
+	session_cookie = ""
+	is_ready = false
+
+	# Delete session file
+	if FileAccess.file_exists(SESSION_FILE_PATH):
+		DirAccess.remove_absolute(SESSION_FILE_PATH)
+		print("Cleared session cookie")

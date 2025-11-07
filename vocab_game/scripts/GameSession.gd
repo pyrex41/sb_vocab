@@ -7,7 +7,8 @@ extends Control
 @onready var next_button = $FeedbackPanel/MarginContainer/VBoxContainer/NextButton
 
 # Loading overlay (created programmatically)
-var loading_overlay: ColorRect
+var loading_overlay: CanvasLayer
+var retry_button: Button
 
 # Activity scene references
 var flashcard_scene = preload("res://scenes/activities/Flashcard.tscn")
@@ -22,22 +23,28 @@ func _ready():
 	feedback_panel.hide()
 	next_button.pressed.connect(_on_next_button_pressed)
 
-	# Create loading overlay
-	loading_overlay = ColorRect.new()
-	loading_overlay.color = Color(0, 0, 0, 0.5)  # Semi-transparent black
-	loading_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
-	loading_overlay.mouse_filter = Control.MOUSE_FILTER_STOP  # Block clicks during loading
-	loading_overlay.hide()
+	# Create loading overlay using CanvasLayer for guaranteed top-level rendering
+	loading_overlay = CanvasLayer.new()
+	loading_overlay.layer = 100  # High layer to ensure it's on top
 	add_child(loading_overlay)
 
-	# Add loading text to overlay
+	# Create background ColorRect
+	var overlay_bg = ColorRect.new()
+	overlay_bg.color = Color(0, 0, 0, 0.5)  # Semi-transparent black
+	overlay_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	overlay_bg.mouse_filter = Control.MOUSE_FILTER_STOP  # Block clicks during loading
+	loading_overlay.add_child(overlay_bg)
+
+	# Add loading text
 	var loading_label = Label.new()
 	loading_label.text = "Loading..."
 	loading_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	loading_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	loading_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	loading_label.add_theme_font_size_override("font_size", 32)
-	loading_overlay.add_child(loading_label)
+	overlay_bg.add_child(loading_label)
+
+	loading_overlay.hide()
 
 	SessionManager.activity_changed.connect(_on_activity_changed)
 	SessionManager.attempt_result.connect(_on_attempt_result)
@@ -111,8 +118,28 @@ func _on_loading_ended():
 		loading_overlay.hide()
 
 func _on_api_error(message: String):
-	# Show error message to user
-	feedback_label.text = message
+	# Show error message to user with retry option
+	feedback_label.text = message + "\n\nWould you like to try again?"
 	feedback_panel.modulate = Color(0.9, 0.3, 0.2)  # Red
+
+	# Change "Continue" button to "Retry"
+	next_button.text = "Retry"
+	# Disconnect old handler if connected
+	if next_button.pressed.is_connected(_on_next_button_pressed):
+		next_button.pressed.disconnect(_on_next_button_pressed)
+	# Connect retry handler
+	next_button.pressed.connect(_on_retry_button_pressed)
+
 	feedback_panel.show()
 	push_error("API Error: " + message)
+
+func _on_retry_button_pressed():
+	# Restore button text and handler
+	next_button.text = "Continue"
+	if next_button.pressed.is_connected(_on_retry_button_pressed):
+		next_button.pressed.disconnect(_on_retry_button_pressed)
+	next_button.pressed.connect(_on_next_button_pressed)
+
+	feedback_panel.hide()
+	# Retry the last failed operation
+	SessionManager.retry_last_operation()

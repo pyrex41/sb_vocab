@@ -6,6 +6,9 @@ extends Control
 @onready var feedback_label = $FeedbackPanel/MarginContainer/VBoxContainer/FeedbackLabel
 @onready var next_button = $FeedbackPanel/MarginContainer/VBoxContainer/NextButton
 
+# Loading overlay (created programmatically)
+var loading_overlay: ColorRect
+
 # Activity scene references
 var flashcard_scene = preload("res://scenes/activities/Flashcard.tscn")
 var multiple_choice_scene = preload("res://scenes/activities/MultipleChoice.tscn")
@@ -18,11 +21,31 @@ var current_activity_node = null
 func _ready():
 	feedback_panel.hide()
 	next_button.pressed.connect(_on_next_button_pressed)
-	
+
+	# Create loading overlay
+	loading_overlay = ColorRect.new()
+	loading_overlay.color = Color(0, 0, 0, 0.5)  # Semi-transparent black
+	loading_overlay.set_anchors_preset(Control.PRESET_FULL_RECT)
+	loading_overlay.mouse_filter = Control.MOUSE_FILTER_STOP  # Block clicks during loading
+	loading_overlay.hide()
+	add_child(loading_overlay)
+
+	# Add loading text to overlay
+	var loading_label = Label.new()
+	loading_label.text = "Loading..."
+	loading_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	loading_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	loading_label.set_anchors_preset(Control.PRESET_FULL_RECT)
+	loading_label.add_theme_font_size_override("font_size", 32)
+	loading_overlay.add_child(loading_label)
+
 	SessionManager.activity_changed.connect(_on_activity_changed)
 	SessionManager.attempt_result.connect(_on_attempt_result)
 	SessionManager.session_ended.connect(_on_session_ended)
-	
+	SessionManager.loading_started.connect(_on_loading_started)
+	SessionManager.loading_ended.connect(_on_loading_ended)
+	SessionManager.api_error.connect(_on_api_error)
+
 	# Start the session
 	SessionManager.start_new_session("grade3")
 
@@ -78,3 +101,18 @@ func _on_next_button_pressed():
 func _on_session_ended(summary: Dictionary):
 	# Navigate to results screen
 	get_tree().change_scene_to_file("res://scenes/ResultsScreen.tscn")
+
+func _on_loading_started():
+	if loading_overlay:
+		loading_overlay.show()
+
+func _on_loading_ended():
+	if loading_overlay:
+		loading_overlay.hide()
+
+func _on_api_error(message: String):
+	# Show error message to user
+	feedback_label.text = message
+	feedback_panel.modulate = Color(0.9, 0.3, 0.2)  # Red
+	feedback_panel.show()
+	push_error("API Error: " + message)

@@ -14,26 +14,17 @@ func _ready():
 
 func setup(activity_data: Dictionary):
 	word_data = activity_data.word
+	options = activity_data.options if activity_data.has("options") else []
+
+	# Determine if this is synonym or antonym based on activity data or randomly
 	is_synonym = randi() % 2 == 0  # Randomly choose synonym or antonym
-	
+
 	if is_synonym:
 		question_label.text = "Choose a SYNONYM for '%s'" % word_data.word
-		options = word_data.synonyms.duplicate()
 	else:
 		question_label.text = "Choose an ANTONYM for '%s'" % word_data.word
-		options = word_data.antonyms.duplicate()
-	
-	# Add some wrong options
-	var all_words = word_data.synonyms + word_data.antonyms
-	while options.size() < 4 and all_words.size() > 0:
-		var wrong_option = all_words[randi() % all_words.size()]
-		if wrong_option not in options:
-			options.append(wrong_option)
-		all_words.erase(wrong_option)
-	
-	options.shuffle()
-	
-	# Create option buttons
+
+	# Create option buttons using API-provided options
 	for option in options:
 		var button = Button.new()
 		button.text = option

@@ -9,8 +9,7 @@ vocab_game/
 ├── project.godot           # Main Godot project configuration
 ├── icon.svg               # Project icon
 ├── scripts/
-│   ├── MockBackend.gd     # Simulates REST API responses
-│   ├── SessionManager.gd  # Coordinates activity flow
+│   ├── SessionManager.gd  # Coordinates activity flow (integrated with PlaycademySDK)
 │   ├── MainMenu.gd        # Main menu controller
 │   ├── GameSession.gd     # Game session controller
 │   ├── ProgressScreen.gd  # Progress display
@@ -46,43 +45,37 @@ vocab_game/
 
 ### System Features
 
-- **Mock Backend Service** - Simulates REST API endpoints:
+- **PlaycademySDK Integration** - Connected to real backend API:
   - `POST /session/start` - Generates a session with mixed activities
   - `POST /session/attempt` - Scores student answers
   - `POST /session/end` - Finalizes session and updates progress
   - `GET /progress` - Returns learning statistics
 
 - **Session Management** - Coordinates activity flow with signals
-- **Progress Tracking** - Tracks words learned, accuracy, and mastery levels
+- **Progress Tracking** - Tracks words learned, accuracy, and mastery levels using FSRS algorithm
 - **Age-Appropriate UI** - Large fonts, bright colors, encouraging feedback
-
-### Mock Data
-
-The MockBackend includes 10 sample vocabulary words with:
-- Word and definition
-- Example sentence
-- Synonyms and antonyms
-- Simulated audio file references
+- **Loading States** - Visual feedback during API calls with input disabling
+- **Error Handling** - User-friendly error messages for network issues
 
 ## How It Works
 
 ### Game Flow
 
 1. **Main Menu** → User clicks "Start Session"
-2. **Session Start** → MockBackend generates 5-8 words with 2-3 activities each (~15-20 activities total)
+2. **Session Start** → Backend generates 5-10 words with 2-3 activities each using FSRS algorithm
 3. **Activity Loop** → Student completes each activity in sequence:
    - Activity is loaded dynamically
    - Student submits answer
+   - Backend validates and scores the answer
    - Immediate feedback (correct/incorrect)
    - Advances to next activity
-4. **Session End** → Shows results and updates progress
+4. **Session End** → Shows results and updates progress via backend
 5. **Results Screen** → Option to continue or return to menu
 
 ### Architecture
 
 #### AutoLoad Singletons
-- **MockBackend** - Manages vocabulary data and simulated API responses
-- **SessionManager** - Coordinates activity flow using signals
+- **SessionManager** - Coordinates activity flow using signals and PlaycademySDK integration
 
 #### Signal Flow
 ```
@@ -91,33 +84,34 @@ SessionManager signals:
 - activity_changed(activity_data, index, total)
 - attempt_result(correct, feedback)
 - session_ended(summary)
+- loading_started()
+- loading_ended()
+- api_error(message)
 
 Activity signals:
 - answer_submitted(answer)
 ```
 
-### Mock Backend Details
+### Backend Integration
 
-The backend simulates real API behavior:
+The application integrates with Playcademy's backend API via PlaycademySDK:
 
 **Session Generation:**
-- Randomly selects 5-8 words from the vocabulary bank
+- Backend uses FSRS (Free Spaced Repetition Scheduler) algorithm
+- Selects optimal words based on student progress
 - Creates 2-3 activities per word
-- Shuffles activities for variety
 - Returns activity queue with all necessary data
 
 **Answer Scoring:**
-- Multiple Choice: Exact match with definition
-- Spelling: Case-insensitive word match
-- Fill in Blank: Case-insensitive word match
-- Synonym/Antonym: Checks against word's synonym/antonym lists
-- Flashcard: Always correct (acknowledgment only)
+- All scoring happens server-side
+- Immediate feedback with correct/incorrect status
+- Detailed feedback messages for learning
 
 **Progress Tracking:**
-- Counts unique words practiced
-- Tracks total attempts and correct attempts
-- Calculates accuracy percentage
-- Maintains mastery levels per word
+- FSRS-based spaced repetition algorithm
+- Tracks words learned, accuracy, and mastery levels
+- Persistent progress across sessions
+- Optimized review scheduling
 
 ## Getting Started
 
@@ -157,10 +151,10 @@ Edit `scripts/MockBackend.gd` and add entries to the `vocabulary_bank` dictionar
 
 ### Adjusting Activity Mix
 
-In `MockBackend.gd`, modify the `start_session()` function to change:
-- Number of words per session (currently 5-8)
-- Number of activities per word (currently 2-3)
-- Activity type distribution
+Activity selection is now controlled by the backend's FSRS algorithm which optimizes:
+- Number of words per session based on student performance
+- Number of activities per word for optimal retention
+- Activity type distribution based on learning progress
 
 ### Styling
 
@@ -169,39 +163,33 @@ All UI elements use Godot's theme system. To customize:
 2. Modify font sizes in theme_override properties
 3. Change layouts in the UI containers
 
+## Integration Status
+
+✅ **Completed:**
+1. **Backend Integration** - SessionManager now uses PlaycademySDK.backend.request() for all API calls
+2. **Error Handling** - User-friendly error messages for network issues, timeouts, and auth errors
+3. **Loading States** - Visual feedback during API calls with input disabling
+4. **FSRS Algorithm** - Backend-powered spaced repetition for optimal learning
+5. **Progress Tracking** - Persistent progress tracking across sessions
+
 ## Future Enhancements
 
-When integrating with real backend:
+Potential improvements:
 
-1. **Replace MockBackend** - Update `SessionManager` to use actual `PlaycademySdk.backend.request()` calls
-2. **Audio Playback** - Implement real audio playback in Spelling activity
-3. **Sentence Generation** - Add 6th activity type for creative sentence writing
-4. **Animations** - Add transitions between activities
-5. **Sound Effects** - Add feedback sounds for correct/incorrect answers
-6. **Adaptive Difficulty** - Implement FSRS-based word selection
-7. **Multiple Grade Levels** - Add grade selection in main menu
+1. **Audio Playback** - Implement real audio playback in Spelling activity (currently simulated)
+2. **Sentence Generation** - Add 6th activity type for creative sentence writing
+3. **Animations** - Add transitions between activities
+4. **Sound Effects** - Add feedback sounds for correct/incorrect answers
+5. **Grade Selection** - Add grade level picker in main menu
+6. **Achievement System** - Add badges and rewards for milestones
 
-## Testing
+## Deployment
 
-The mock backend makes testing easy:
-- No network required
-- Predictable responses
-- Adjustable difficulty
-- Fast iteration
-
-## Notes for Playcademy Integration
-
-Current implementation uses:
-- Manual scene loading via `get_tree().change_scene_to_file()`
-- No PlaycademySDK calls (mocked instead)
-- No deployment configuration
-
-To integrate with Playcademy platform:
-1. Replace MockBackend calls with PlaycademySDK.backend.request()
-2. Add Playcademy Manifest Exporter plugin
-3. Configure web export with custom shell
-4. Add authentication flow
-5. Implement proper error handling for network requests
+The application is configured for deployment to Playcademy platform:
+- Web export configured with Playcademy HTML shell
+- PlaycademySDK integration for authentication and API access
+- Error handling and loading states for production use
+- Ready for staging and production deployment
 
 ## License
 

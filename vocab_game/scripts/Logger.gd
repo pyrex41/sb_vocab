@@ -27,6 +27,9 @@ const COLOR_ERROR = "\u001b[31m"   # Red
 const COLOR_RESET = "\u001b[0m"
 
 func _ready():
+	# Validate AutoLoad dependency order
+	assert(Config != null, "CRITICAL: Logger depends on Config AutoLoad! Check project.godot AutoLoad order - Config must come before Logger")
+
 	# Load log level from config
 	if not Config:
 		push_error("Config not available! Logger falling back to INFO level")

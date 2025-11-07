@@ -9,7 +9,18 @@ var user_id: String = ""
 var password: String = ""
 var is_ready: bool = false
 var session_cookie: String = ""  # Stores the authentication cookie
+var session_expires_at: int = 0  # Unix timestamp when session expires
 signal sdk_ready()
+
+# Session and security settings
+const SESSION_DURATION = 3600  # 1 hour in seconds
+const SESSION_MAX_AGE = 86400  # 24 hours max session age
+
+# Rate limiting for authentication
+var _login_attempts: int = 0
+var _last_login_attempt: int = 0
+const MAX_LOGIN_ATTEMPTS = 5
+const LOCKOUT_DURATION = 300  # 5 minutes in seconds
 
 # Backend request handler
 class Backend:
@@ -117,6 +128,10 @@ var backend: Backend
 const SESSION_FILE_PATH = "user://session.dat"
 
 func _ready():
+	# Validate AutoLoad dependencies
+	assert(Config != null, "CRITICAL: PlaycademySdk depends on Config AutoLoad! Check project.godot AutoLoad order")
+	assert(Logger != null, "CRITICAL: PlaycademySdk depends on Logger AutoLoad! Check project.godot AutoLoad order")
+
 	backend = Backend.new(self)
 
 	# Load configuration from Config autoload
@@ -144,7 +159,21 @@ func _ready():
 		Logger.info("SDK Ready (manual login required)", "PlaycademySdk")
 
 func login() -> bool:
-	Logger.info("Attempting login as: " + user_id, "PlaycademySdk")
+	# Check rate limiting
+	if _login_attempts >= MAX_LOGIN_ATTEMPTS:
+		var time_since_last = Time.get_unix_time_from_system() - _last_login_attempt
+		if time_since_last < LOCKOUT_DURATION:
+			var remaining = LOCKOUT_DURATION - time_since_last
+			Logger.error("Too many login attempts. Try again in " + str(remaining) + " seconds", "PlaycademySdk")
+			return false
+		else:
+			# Lockout period expired, reset attempts
+			_login_attempts = 0
+
+	_login_attempts += 1
+	_last_login_attempt = Time.get_unix_time_from_system()
+
+	Logger.info("Attempting login as: " + user_id + " (attempt " + str(_login_attempts) + "/" + str(MAX_LOGIN_ATTEMPTS) + ")", "PlaycademySdk")
 
 	var response = await backend.request("POST", "/auth/sign-in/email", {
 		"email": user_id,
@@ -157,6 +186,13 @@ func login() -> bool:
 
 	Logger.info("Login successful!", "PlaycademySdk")
 	is_ready = true
+
+	# Reset login attempts on success
+	_login_attempts = 0
+
+	# Set session expiration
+	session_expires_at = Time.get_unix_time_from_system() + SESSION_DURATION
+	Logger.debug("Session expires at: " + Time.get_datetime_string_from_unix_time(session_expires_at), "PlaycademySdk")
 
 	# Persist session cookie to file (with error handling)
 	if not _save_session_cookie():
@@ -176,35 +212,68 @@ func _load_and_validate_session() -> bool:
 		Logger.warn("Failed to open session file", "PlaycademySdk")
 		return false
 
-	# Read and decode session cookie
+	# Read session data (cookie + expiration)
 	var encoded_cookie = file.get_line()
+	var expiration_str = file.get_line()
 	file.close()
 
 	if encoded_cookie == "":
 		return false
 
-	# Simple XOR obfuscation (not encryption, but better than plaintext)
+	# Parse expiration timestamp
+	if expiration_str != "":
+		session_expires_at = int(expiration_str)
+	else:
+		# Old format without expiration, consider expired
+		Logger.warn("Session file missing expiration data", "PlaycademySdk")
+		clear_session()
+		return false
+
+	# Check if session has expired by age
+	var current_time = Time.get_unix_time_from_system()
+	var session_age = current_time - (session_expires_at - SESSION_DURATION)
+
+	if session_age > SESSION_MAX_AGE:
+		Logger.warn("Session too old (age: " + str(session_age) + "s), clearing", "PlaycademySdk")
+		clear_session()
+		return false
+
+	# Check if session has expired by timeout
+	if _is_session_expired():
+		Logger.warn("Session expired (timeout), clearing", "PlaycademySdk")
+		clear_session()
+		return false
+
+	# Decode session cookie
+	# WARNING: XOR with hardcoded key is NOT real encryption!
+	# This provides obfuscation only. For production, use platform keychain APIs.
 	session_cookie = _decode_session(encoded_cookie)
 
 	if session_cookie == "":
 		Logger.warn("Failed to decode session cookie", "PlaycademySdk")
 		return false
 
-	Logger.debug("Loaded persisted session cookie", "PlaycademySdk")
+	Logger.debug("Loaded persisted session cookie (expires in " + str(session_expires_at - current_time) + "s)", "PlaycademySdk")
 
-	# Validate session by making a test request
+	# Validate session by making a test request to backend
 	var test_response = await backend.request("GET", "/auth/session", {})
 
 	if test_response.has("error"):
-		Logger.warn("Persisted session is invalid or expired, clearing it", "PlaycademySdk")
+		Logger.warn("Persisted session is invalid or expired by backend, clearing it", "PlaycademySdk")
 		clear_session()
 		return false
 
 	Logger.info("Persisted session validated successfully", "PlaycademySdk")
 	return true
 
+func _is_session_expired() -> bool:
+	"""Check if current session has expired"""
+	if session_expires_at == 0:
+		return true  # No session or not set
+	return Time.get_unix_time_from_system() > session_expires_at
+
 func _save_session_cookie() -> bool:
-	"""Save session cookie to file storage with basic obfuscation"""
+	"""Save session cookie and expiration to file storage with basic obfuscation"""
 	if session_cookie == "":
 		Logger.warn("Attempted to save empty session cookie", "PlaycademySdk")
 		return false
@@ -214,12 +283,17 @@ func _save_session_cookie() -> bool:
 		Logger.error("Failed to open session file for writing", "PlaycademySdk")
 		return false
 
-	# Simple XOR obfuscation (better than plaintext, though not true encryption)
+	# WARNING: XOR with hardcoded key is NOT real encryption!
+	# This is obfuscation only. For production, use:
+	# - iOS: Keychain Services
+	# - Android: KeyStore
+	# - macOS/Linux: Secret Service API
 	var encoded_cookie = _encode_session(session_cookie)
 	file.store_line(encoded_cookie)
+	file.store_line(str(session_expires_at))  # Store expiration timestamp
 	file.close()
 
-	Logger.debug("Saved session cookie to file", "PlaycademySdk")
+	Logger.debug("Saved session cookie to file (expires: " + Time.get_datetime_string_from_unix_time(session_expires_at) + ")", "PlaycademySdk")
 	return true
 
 func _encode_session(text: String) -> String:

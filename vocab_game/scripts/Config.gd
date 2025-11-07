@@ -18,6 +18,17 @@ var config = {
 # Valid log levels
 const VALID_LOG_LEVELS = ["DEBUG", "INFO", "WARN", "WARNING", "ERROR", "NONE"]
 
+# Config schema for validation
+const CONFIG_SCHEMA = {
+	"backend_url": TYPE_STRING,
+	"user_id": TYPE_STRING,
+	"password": TYPE_STRING,
+	"auto_login": TYPE_BOOL,
+	"debug_mode": TYPE_BOOL,
+	"enable_audio": TYPE_BOOL,
+	"log_level": TYPE_STRING
+}
+
 # Config file path
 const CONFIG_FILE_PATH = "res://config.json"
 const USER_CONFIG_PATH = "user://config.json"
@@ -78,16 +89,49 @@ func _load_from_file(file_path: String) -> bool:
 	for key in loaded_config:
 		config[key] = loaded_config[key]
 
-	# Validate critical configuration values
+	# Validate schema and critical configuration values
+	if not _validate_schema():
+		push_error("Config validation failed - using defaults for invalid values")
+
 	_validate_config()
 
 	return true
 
+func _validate_schema() -> bool:
+	"""Validate that all required config keys exist and have correct types"""
+	var is_valid = true
+
+	for key in CONFIG_SCHEMA:
+		if not config.has(key):
+			push_warning("Missing required config key: '" + key + "', using default")
+			is_valid = false
+			continue
+
+		var expected_type = CONFIG_SCHEMA[key]
+		var actual_type = typeof(config[key])
+
+		if actual_type != expected_type:
+			push_warning("Invalid type for config key '" + key + "': expected " + _type_to_string(expected_type) + ", got " + _type_to_string(actual_type))
+			is_valid = false
+
+	return is_valid
+
+func _type_to_string(type: int) -> String:
+	"""Convert Variant type constant to string"""
+	match type:
+		TYPE_BOOL: return "bool"
+		TYPE_STRING: return "string"
+		TYPE_INT: return "int"
+		TYPE_FLOAT: return "float"
+		TYPE_DICTIONARY: return "dictionary"
+		TYPE_ARRAY: return "array"
+		_: return "unknown"
+
 func _validate_config():
 	"""Validate configuration values and fix or warn about issues"""
-	# Validate backend URL
-	if not config.backend_url.begins_with("http://") and not config.backend_url.begins_with("https://"):
-		push_warning("Invalid backend_url: must start with http:// or https://")
+	# Validate backend URL with regex
+	if not _is_valid_url(config.backend_url):
+		push_warning("Invalid backend_url format: '" + config.backend_url + "', using default")
 		config.backend_url = "http://localhost:8788/api"
 
 	# Validate log level
@@ -111,6 +155,14 @@ func _validate_config():
 	if typeof(config.enable_audio) != TYPE_BOOL:
 		push_warning("enable_audio should be a boolean, converting")
 		config.enable_audio = bool(config.enable_audio)
+
+func _is_valid_url(url: String) -> bool:
+	"""Validate URL format using regex"""
+	var regex = RegEx.new()
+	# Match http(s)://host(:port)?(/path)?
+	regex.compile("^https?://[a-zA-Z0-9.-]+(:[0-9]+)?(/[^\\s]*)?$")
+	var result = regex.search(url)
+	return result != null
 
 func get_value(key: String, default = null):
 	"""Get a configuration value by key"""

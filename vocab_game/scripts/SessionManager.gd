@@ -15,6 +15,7 @@ var activities: Array = []
 var current_activity_index: int = 0
 var session_active: bool = false
 var last_failed_operation: Dictionary = {}  # Store failed operation for retry
+var course_id: String = ""  # Will store the first available course ID
 
 func start_new_session(grade: String = "grade3"):
 	# Store operation for retry in case of failure
@@ -27,12 +28,30 @@ func start_new_session(grade: String = "grade3"):
 
 	loading_started.emit()
 
+	# First, get available courses if we don't have a course_id yet
+	if course_id == "":
+		print("Fetching available courses...")
+		var courses_response = await PlaycademySdk.backend.request("GET", "/content/course", {})
+
+		if courses_response.has("error"):
+			loading_ended.emit()
+			_handle_api_error(courses_response.error)
+			return
+
+		if courses_response.has("courses") and courses_response.courses.size() > 0:
+			course_id = courses_response.courses[0].courseId
+			print("Using course ID: ", course_id)
+		else:
+			loading_ended.emit()
+			api_error.emit("No courses available. Please set up courses in the backend.")
+			return
+
+	# Now start the session with the course ID
 	var response = await PlaycademySdk.backend.request(
 		"POST",
 		"/session/start",
 		{
-			"user_id": PlaycademySdk.user_id,
-			"grade": grade
+			"courseId": course_id
 		}
 	)
 
@@ -50,21 +69,50 @@ func start_new_session(grade: String = "grade3"):
 
 	# Success - clear failed operation and update state
 	last_failed_operation.clear()
-	current_session_id = response.session_id
-	activities = response.activities
+	current_session_id = response.sessionId
+	activities = []  # Will be loaded one at a time via /session/:id/next
 	current_activity_index = 0
 	session_active = true
 
+	print("Session started! ID: ", current_session_id, " Items: ", response.itemCount)
 	session_started.emit(response)
-	_load_current_activity()
 
-func _load_current_activity():
-	if current_activity_index >= activities.size():
+	# Load first activity
+	await _load_next_activity()
+
+func _load_next_activity():
+	"""Load the next activity from the backend"""
+	if not session_active:
+		return
+
+	loading_started.emit()
+
+	var response = await PlaycademySdk.backend.request(
+		"POST",
+		"/session/" + current_session_id + "/next",
+		{}
+	)
+
+	loading_ended.emit()
+
+	if response.has("error"):
+		_handle_api_error(response.error)
+		return
+
+	# Check if session is complete (no more items)
+	if response.has("completed") and response.completed:
+		print("Session complete!")
 		_end_session()
 		return
-	
-	var activity = activities[current_activity_index]
-	activity_changed.emit(activity, current_activity_index + 1, activities.size())
+
+	# Emit activity changed with the new activity data
+	print("Loaded activity: ", response.activityType)
+	activity_changed.emit(response, current_activity_index, -1)  # Total count not available
+	current_activity_index += 1
+
+func _load_current_activity():
+	# Legacy function - now we use _load_next_activity
+	await _load_next_activity()
 
 func submit_answer(answer: String):
 	if not session_active:
@@ -216,7 +264,7 @@ func _check_authentication() -> bool:
 		api_error.emit("PlaycademySDK not initialized. Please restart the application.")
 		return false
 
-	if not PlaycademySdk.has("user_id") or PlaycademySdk.user_id == "":
+	if not "user_id" in PlaycademySdk or PlaycademySdk.user_id == "":
 		push_error("User not authenticated")
 		api_error.emit("Please log in to continue.")
 		return false
@@ -225,14 +273,11 @@ func _check_authentication() -> bool:
 
 func _validate_session_response(response: Dictionary) -> bool:
 	"""Validate session start response has required fields"""
-	if not response.has("session_id"):
-		push_error("Response missing session_id")
+	if not response.has("sessionId"):
+		push_error("Response missing sessionId")
 		return false
-	if not response.has("activities"):
-		push_error("Response missing activities array")
-		return false
-	if not response.activities is Array:
-		push_error("Activities is not an array")
+	if not response.has("itemCount"):
+		push_error("Response missing itemCount")
 		return false
 	return true
 

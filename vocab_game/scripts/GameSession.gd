@@ -65,17 +65,18 @@ func _load_activity(activity_data: Dictionary):
 	if current_activity_node:
 		current_activity_node.queue_free()
 		current_activity_node = null
-	
+
 	# Load appropriate activity scene
 	var scene = null
-	match activity_data.type:
+	var activity_type = activity_data.activityType if activity_data.has("activityType") else activity_data.get("type", "")
+	match activity_type:
 		"flashcard":
 			scene = flashcard_scene
-		"multiple_choice":
+		"multiple_choice", "definition_mc":
 			scene = multiple_choice_scene
-		"spelling":
+		"spelling", "spell_typed":
 			scene = spelling_scene
-		"fill_blank":
+		"fill_blank", "cloze_typed":
 			scene = fill_blank_scene
 		"synonym_antonym":
 			scene = synonym_antonym_scene

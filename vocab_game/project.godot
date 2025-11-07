@@ -17,7 +17,6 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-MockBackend="*res://scripts/MockBackend.gd"
 SessionManager="*res://scripts/SessionManager.gd"
 
 [display]

@@ -39,30 +39,25 @@
 4. **Fill in Blank** - Type the missing word
 5. **Synonym/Antonym** - Choose the correct synonym or antonym
 
-## Checking the Mock Data
+## Backend Integration
 
-To see what words are available:
-1. Open `scripts/MockBackend.gd`
-2. Look at the `vocabulary_bank` dictionary
-3. Currently has 10 words: abundant, curious, delicate, enormous, fierce, graceful, humble, swift, tranquil, valiant
+The application is now integrated with Playcademy's backend API:
+- Vocabulary words are managed by the backend
+- Session generation uses FSRS algorithm for optimal learning
+- Progress is tracked persistently across sessions
 
 ## Making Changes
-
-### Add More Words
-Edit `scripts/MockBackend.gd` → Add to `vocabulary_bank`
 
 ### Change UI Colors
 Edit any `.tscn` file → Modify ColorRect colors or theme_override properties
 
-### Adjust Session Length
-Edit `scripts/MockBackend.gd` → Line 100: `var num_words = min(randi() % 4 + 5, words.size())`
-- Change `5` to adjust minimum words
-- Change `4` to adjust range
+### Customize Activities
+Edit activity scripts in `scripts/activities/` to modify behavior
 
 ### Debug Mode
 In Godot Editor:
 - Open "Output" panel at bottom to see print statements
-- MockBackend prints "Mock Backend initialized" on startup
+- SessionManager logs API calls and responses
 - Add more `print()` statements to debug
 
 ## Common Issues
@@ -96,34 +91,38 @@ scenes/ResultsScreen.tscn → Show results
 ```
 User clicks "Start Session"
     → SessionManager.start_new_session()
-    → MockBackend.start_session()
+    → SessionManager emits 'loading_started'
+    → PlaycademySDK.backend.request('/session/start')
+    → SessionManager emits 'loading_ended'
     → SessionManager emits 'session_started'
     → SessionManager emits 'activity_changed'
     → GameSession loads activity scene
-    
+
 User submits answer
     → Activity emits 'answer_submitted'
     → SessionManager.submit_answer()
-    → MockBackend.submit_attempt()
+    → SessionManager emits 'loading_started'
+    → PlaycademySDK.backend.request('/session/attempt')
+    → SessionManager emits 'loading_ended'
     → SessionManager emits 'attempt_result'
     → GameSession shows feedback
     → Auto-advance to next activity
-    
+
 All activities complete
     → SessionManager._end_session()
-    → MockBackend.end_session()
+    → SessionManager emits 'loading_started'
+    → PlaycademySDK.backend.request('/session/end')
+    → SessionManager emits 'loading_ended'
     → SessionManager emits 'session_ended'
     → Navigate to ResultsScreen
 ```
 
-## Next Steps
+## Deployment
 
-Once comfortable with the mock version:
-1. Review Playcademy SDK documentation
-2. Replace MockBackend calls with PlaycademySdk.backend.request()
-3. Add proper error handling
-4. Implement audio playback
-5. Add animations and polish
-6. Test deployment with `playcademy deploy`
+The application is ready for deployment to Playcademy platform:
+1. Ensure PlaycademySDK is installed and configured
+2. Configure web export with Playcademy HTML shell
+3. Test in staging environment
+4. Deploy to production with `playcademy deploy`
 
 Enjoy building! 🎮

@@ -1,0 +1,30 @@
+{% extends "layouts/default.html" %}
+
+{% block content %}
+<div class="activity spelling-activity">
+    <div class="progress-bar">
+        <div class="progress-fill" style="width: {{ progress }}%;"></div>
+    </div>
+
+    <h2 class="activity-title">Listen and Spell the Word</h2>
+
+    <div class="audio-container">
+        <audio id="word-audio" src="{{ activity.word.audio_url }}"></audio>
+        <button id="play-audio-btn" class="btn btn-audio" onclick="playWordAudio()">
+            🔊 Play Word
+        </button>
+    </div>
+
+    <div class="input-container">
+        <input type="text"
+               id="spelling-input"
+               class="text-input"
+               placeholder="Type the word here..."
+               onkeypress="if(event.key === 'Enter') submitSpelling()">
+    </div>
+
+    <button class="btn btn-primary" onclick="submitSpelling()">Submit Answer</button>
+
+    <div id="feedback" class="feedback"></div>
+</div>
+{% endblock %}

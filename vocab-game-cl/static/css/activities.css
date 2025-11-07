@@ -1,0 +1,184 @@
+/* Activity-Specific Styles */
+
+.activity {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.activity-title {
+    font-size: 1.8rem;
+    text-align: center;
+    margin-bottom: 2rem;
+    color: var(--primary-color);
+}
+
+/* Flashcard Activity */
+.flashcard-container {
+    background: white;
+    border-radius: 1rem;
+    padding: 3rem;
+    box-shadow: var(--card-shadow);
+    margin: 2rem 0;
+}
+
+.word-display {
+    font-size: 3rem;
+    font-weight: bold;
+    text-align: center;
+    color: var(--primary-color);
+    margin-bottom: 2rem;
+}
+
+.definition-card h3 {
+    color: var(--secondary-color);
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.definition, .example {
+    font-size: 1.1rem;
+    line-height: 1.8;
+}
+
+.example {
+    color: #6b7280;
+}
+
+#continue-btn {
+    display: block;
+    margin: 2rem auto 0;
+    min-width: 200px;
+}
+
+/* Multiple Choice & Synonym/Antonym */
+.options-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1rem;
+    margin: 2rem 0;
+}
+
+.option-button {
+    padding: 1.5rem;
+    background: white;
+    border: 2px solid var(--border-color);
+    border-radius: 0.75rem;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.option-button:hover {
+    border-color: var(--primary-color);
+    background-color: #f3f4f6;
+    transform: translateY(-2px);
+}
+
+.option-button:active {
+    transform: translateY(0);
+}
+
+/* Spelling Activity */
+.audio-container {
+    text-align: center;
+    margin: 2rem 0;
+}
+
+.audio-container audio {
+    display: none;
+}
+
+/* Feedback */
+.feedback {
+    margin-top: 2rem;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    text-align: center;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.feedback.correct, .correct {
+    background-color: #d1fae5;
+    color: #065f46;
+    border: 2px solid #10b981;
+}
+
+.feedback.incorrect, .incorrect {
+    background-color: #fee2e2;
+    color: #991b1b;
+    border: 2px solid #ef4444;
+}
+
+/* Sentence Container */
+.sentence-container {
+    background: white;
+    border-radius: 1rem;
+    padding: 2rem;
+    box-shadow: var(--card-shadow);
+    margin: 2rem 0;
+}
+
+.sentence {
+    font-size: 1.5rem;
+    line-height: 2;
+    text-align: center;
+}
+
+/* Results & Progress Screens */
+.results-screen, .progress-screen, .error-screen {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.results-card h2, .progress-card h2, .progress-card h3 {
+    color: var(--primary-color);
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+.error-message {
+    text-align: center;
+    font-size: 1.1rem;
+    color: #6b7280;
+    margin: 2rem 0;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.activity {
+    animation: fadeIn 0.5s ease;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .word-display {
+        font-size: 2rem;
+    }
+
+    .activity-title {
+        font-size: 1.4rem;
+    }
+
+    .flashcard-container {
+        padding: 2rem 1rem;
+    }
+
+    .options-container {
+        grid-template-columns: 1fr;
+    }
+
+    .sentence {
+        font-size: 1.2rem;
+    }
+}

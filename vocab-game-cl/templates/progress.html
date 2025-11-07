@@ -1,0 +1,52 @@
+{% extends "layouts/default.html" %}
+
+{% block content %}
+<div class="progress-screen">
+    <h1 class="page-title">Your Progress</h1>
+
+    <div class="progress-card">
+        <h2>Overall Statistics</h2>
+
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-value">{{ total_words }}</div>
+                <div class="stat-label">Words Practiced</div>
+            </div>
+
+            <div class="stat-item">
+                <div class="stat-value">{{ accuracy }}%</div>
+                <div class="stat-label">Overall Accuracy</div>
+            </div>
+
+            <div class="stat-item">
+                <div class="stat-value">{{ sessions }}</div>
+                <div class="stat-label">Sessions Completed</div>
+            </div>
+        </div>
+
+        <h3>Mastery Breakdown</h3>
+        <div class="mastery-grid">
+            <div class="mastery-item new">
+                <div class="mastery-count">{{ mastery.new }}</div>
+                <div class="mastery-label">New</div>
+            </div>
+            <div class="mastery-item learning">
+                <div class="mastery-count">{{ mastery.learning }}</div>
+                <div class="mastery-label">Learning</div>
+            </div>
+            <div class="mastery-item reviewing">
+                <div class="mastery-count">{{ mastery.reviewing }}</div>
+                <div class="mastery-label">Reviewing</div>
+            </div>
+            <div class="mastery-item mastered">
+                <div class="mastery-count">{{ mastery.mastered }}</div>
+                <div class="mastery-label">Mastered</div>
+            </div>
+        </div>
+
+        <div class="actions">
+            <a href="/" class="btn btn-primary">Continue Learning</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

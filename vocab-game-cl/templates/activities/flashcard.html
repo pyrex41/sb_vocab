@@ -1,0 +1,27 @@
+{% extends "layouts/default.html" %}
+
+{% block content %}
+<div class="activity flashcard-activity">
+    <div class="progress-bar">
+        <div class="progress-fill" style="width: {{ progress }}%;"></div>
+    </div>
+
+    <h2 class="activity-title">Learn This Word</h2>
+
+    <div class="flashcard-container">
+        <div class="word-display">{{ activity.word.word }}</div>
+
+        <div class="definition-card">
+            <h3>Definition</h3>
+            <p class="definition">{{ activity.word.definition }}</p>
+
+            <h3>Example</h3>
+            <p class="example"><em>{{ activity.word.example }}</em></p>
+        </div>
+    </div>
+
+    <button id="continue-btn" class="btn btn-primary" onclick="continueSession()">
+        I understand! Continue →
+    </button>
+</div>
+{% endblock %}

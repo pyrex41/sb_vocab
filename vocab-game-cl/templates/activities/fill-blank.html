@@ -1,0 +1,29 @@
+{% extends "layouts/default.html" %}
+
+{% block content %}
+<div class="activity fill-blank-activity">
+    <div class="progress-bar">
+        <div class="progress-fill" style="width: {{ progress }}%;"></div>
+    </div>
+
+    <h2 class="activity-title">Complete the Sentence</h2>
+
+    <div class="sentence-container">
+        <p class="sentence">
+            {{ activity.word.example | replace(activity.word.word, "______") }}
+        </p>
+    </div>
+
+    <div class="input-container">
+        <input type="text"
+               id="blank-input"
+               class="text-input"
+               placeholder="Fill in the blank"
+               onkeypress="if(event.key === 'Enter') submitBlank()">
+    </div>
+
+    <button class="btn btn-primary" onclick="submitBlank()">Submit Answer</button>
+
+    <div id="feedback" class="feedback"></div>
+</div>
+{% endblock %}

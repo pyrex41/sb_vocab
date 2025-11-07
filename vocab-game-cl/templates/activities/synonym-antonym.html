@@ -1,0 +1,21 @@
+{% extends "layouts/default.html" %}
+
+{% block content %}
+<div class="activity synonym-antonym-activity">
+    <div class="progress-bar">
+        <div class="progress-fill" style="width: {{ progress }}%;"></div>
+    </div>
+
+    <h2 class="activity-title">Select a {{ activity.relationship }} for "{{ activity.word.word }}"</h2>
+
+    <div class="options-container">
+        {% for option in activity.options %}
+        <button class="option-button" onclick="selectOption('{{ option }}')">
+            {{ option }}
+        </button>
+        {% endfor %}
+    </div>
+
+    <div id="feedback" class="feedback"></div>
+</div>
+{% endblock %}

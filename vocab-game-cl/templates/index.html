@@ -1,0 +1,59 @@
+{% extends "layouts/default.html" %}
+
+{% block content %}
+<div class="main-menu">
+    <h1 class="page-title">Welcome to Vocabulary Game!</h1>
+    <p class="subtitle">Choose your grade level to begin learning</p>
+
+    <div class="login-section">
+        <label for="email">Enter your email:</label>
+        <input type="email" id="email" placeholder="student@example.com" class="email-input">
+    </div>
+
+    <div class="course-grid">
+        {% for course in courses %}
+        <div class="course-card" onclick="startSession('{{ course.id }}')">
+            <div class="grade-badge">Grade {{ course.grade }}</div>
+            <h3>{{ course.name }}</h3>
+            <p>Click to start learning!</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra-js %}
+<script>
+function startSession(courseId) {
+    const email = document.getElementById('email').value;
+    if (!email) {
+        alert('Please enter your email first!');
+        return;
+    }
+    startSessionAPI(courseId, email);
+}
+
+function startSessionAPI(courseId, email) {
+    fetch('/start-session', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ courseId: courseId, email: email }),
+        credentials: 'include'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.error) {
+            alert('Error: ' + data.error);
+        } else {
+            window.location.href = '/game?sessionId=' + data.sessionId;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to start session. Please try again.');
+    });
+}
+</script>
+{% endblock %}

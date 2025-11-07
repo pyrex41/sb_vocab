@@ -1,0 +1,38 @@
+{% extends "layouts/default.html" %}
+
+{% block content %}
+<div class="results-screen">
+    <h1 class="page-title">🎉 Great Job!</h1>
+
+    <div class="results-card">
+        <h2>Session Complete</h2>
+
+        <div class="stats-grid">
+            <div class="stat-item">
+                <div class="stat-value">{{ correct }}/{{ total }}</div>
+                <div class="stat-label">Correct Answers</div>
+            </div>
+
+            <div class="stat-item">
+                <div class="stat-value">{{ accuracy }}%</div>
+                <div class="stat-label">Accuracy</div>
+            </div>
+
+            <div class="stat-item">
+                <div class="stat-value">{{ words }}</div>
+                <div class="stat-label">Words Practiced</div>
+            </div>
+
+            <div class="stat-item">
+                <div class="stat-value">{{ duration }}s</div>
+                <div class="stat-label">Time Spent</div>
+            </div>
+        </div>
+
+        <div class="actions">
+            <a href="/" class="btn btn-primary">Play Again</a>
+            <a href="/progress" class="btn btn-secondary">View Progress</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

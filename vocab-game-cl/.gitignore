@@ -1,0 +1,56 @@
+# Common Lisp
+*.fasl
+*.fas
+*.lib
+*.dx64fsl
+*.lx64fsl
+*.x86f
+*.amd64f
+*~
+*.bak
+*.orig
+*.FASL
+*.fasl
+*.lisp-temp
+*.dfsl
+*.pfsl
+*.d64fsl
+*.dx32fsl
+*.lx32fsl
+*.ufsl
+*.nfsl
+*.cfsl
+*.err
+
+# Quicklisp
+quicklisp/
+
+# ASDF
+*.cache/
+
+# Editors
+.DS_Store
+*.swp
+*.swo
+*~
+.#*
+\#*\#
+*.elc
+.idea/
+*.iml
+.vscode/
+.dir-locals.el
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+
+# Generated files
+static/js/generated.js
+
+# OS
+.DS_Store
+Thumbs.db

@@ -61,8 +61,11 @@ func _on_activity_changed(activity_data: Dictionary, index: int, total: int):
 	_load_activity(activity_data)
 
 func _load_activity(activity_data: Dictionary):
-	# Clear previous activity
+	# Fade out previous activity
 	if current_activity_node:
+		var fade_out = create_tween()
+		fade_out.tween_property(current_activity_node, "modulate:a", 0, 0.2)
+		await fade_out.finished
 		current_activity_node.queue_free()
 		current_activity_node = null
 
@@ -80,31 +83,99 @@ func _load_activity(activity_data: Dictionary):
 			scene = fill_blank_scene
 		"synonym_antonym":
 			scene = synonym_antonym_scene
-	
+
 	if scene:
 		current_activity_node = scene.instantiate()
+		current_activity_node.modulate.a = 0  # Start invisible
 		activity_container.add_child(current_activity_node)
 		current_activity_node.setup(activity_data)
-		
+
 		# Connect answer submission
 		if current_activity_node.has_signal("answer_submitted"):
 			current_activity_node.answer_submitted.connect(_on_answer_submitted)
+
+		# Fade in new activity
+		var fade_in = create_tween()
+		fade_in.tween_property(current_activity_node, "modulate:a", 1, 0.3)
 
 func _on_answer_submitted(answer: String):
 	SessionManager.submit_answer(answer)
 
 func _on_attempt_result(correct: bool, feedback: String):
 	feedback_label.text = feedback
-	
+
 	if correct:
 		feedback_panel.modulate = Color(0.2, 0.8, 0.3)  # Green
+		_play_correct_animation()
 	else:
 		feedback_panel.modulate = Color(0.9, 0.3, 0.2)  # Red
-	
+		_play_incorrect_animation()
+
+	# Pop in the feedback panel with scale animation
+	feedback_panel.scale = Vector2(0, 0)
 	feedback_panel.show()
 
+	var tween = create_tween()
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_BACK)
+	tween.tween_property(feedback_panel, "scale", Vector2(1, 1), 0.5)
+
+func _play_correct_animation():
+	# Bounce animation for the feedback panel
+	var tween = create_tween()
+	tween.set_ease(Tween.EASE_OUT)
+	tween.tween_property(feedback_panel, "scale", Vector2(1.1, 1.1), 0.2)
+	tween.tween_property(feedback_panel, "scale", Vector2(1.0, 1.0), 0.2)
+
+	# Add sparkle/star effect
+	_create_celebration_particles()
+
+func _play_incorrect_animation():
+	# Gentle shake animation using rotation
+	var tween = create_tween()
+	tween.tween_property(feedback_panel, "rotation", deg_to_rad(-5), 0.05)
+	tween.tween_property(feedback_panel, "rotation", deg_to_rad(5), 0.05)
+	tween.tween_property(feedback_panel, "rotation", deg_to_rad(-3), 0.05)
+	tween.tween_property(feedback_panel, "rotation", deg_to_rad(3), 0.05)
+	tween.tween_property(feedback_panel, "rotation", 0, 0.05)
+
+func _create_celebration_particles():
+	# Create simple celebration effect with labels
+	var celebration_words = ["⭐", "✨", "🌟", "🎉", "🎊"]
+
+	for i in range(8):
+		var label = Label.new()
+		label.text = celebration_words[i % celebration_words.size()]
+		label.add_theme_font_size_override("font_size", 32)
+		label.modulate = Color(1, 1, 1, 1)
+
+		# Random position around the feedback panel
+		var random_x = randf_range(-200, 200)
+		var random_y = randf_range(-100, 100)
+		label.position = feedback_panel.position + Vector2(random_x, random_y)
+
+		add_child(label)
+
+		# Animate the particle
+		var tween = create_tween()
+		tween.set_parallel(true)
+		tween.tween_property(label, "position:y", label.position.y - 150, 1.5)
+		tween.tween_property(label, "modulate:a", 0, 1.5)
+		tween.tween_property(label, "scale", Vector2(1.5, 1.5), 1.5)
+
+		# Clean up after animation
+		await tween.finished
+		label.queue_free()
+
 func _on_next_button_pressed():
+	# Scale out the feedback panel
+	var tween = create_tween()
+	tween.set_ease(Tween.EASE_IN)
+	tween.set_trans(Tween.TRANS_BACK)
+	tween.tween_property(feedback_panel, "scale", Vector2(0, 0), 0.3)
+	await tween.finished
 	feedback_panel.hide()
+	feedback_panel.scale = Vector2(1, 1)  # Reset for next time
 
 func _on_session_ended(summary: Dictionary):
 	# Navigate to results screen

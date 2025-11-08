@@ -6,9 +6,9 @@ extends Node
 
 # Default configuration values
 var config = {
-	"backend_url": "http://localhost:8788/api",
+	"backend_url": "https://localhost:8788/api",  # Changed to HTTPS for security
 	"user_id": "student.fresh@demo.playcademy.com",
-	"password": "password",  # WARNING: Storing passwords is a security risk! Use secure auth in production
+	# Password removed - must be provided at login for security
 	"auto_login": true,
 	"debug_mode": true,
 	"enable_audio": true,
@@ -22,7 +22,7 @@ const VALID_LOG_LEVELS = ["DEBUG", "INFO", "WARN", "WARNING", "ERROR", "NONE"]
 const CONFIG_SCHEMA = {
 	"backend_url": TYPE_STRING,
 	"user_id": TYPE_STRING,
-	"password": TYPE_STRING,
+	# "password" removed - no longer stored in config
 	"auto_login": TYPE_BOOL,
 	"debug_mode": TYPE_BOOL,
 	"enable_audio": TYPE_BOOL,
@@ -129,19 +129,15 @@ func _type_to_string(type: int) -> String:
 
 func _validate_config():
 	"""Validate configuration values and fix or warn about issues"""
-	# Validate backend URL with regex
+	# Validate backend URL with regex (HTTPS only)
 	if not _is_valid_url(config.backend_url):
-		push_warning("Invalid backend_url format: '" + config.backend_url + "', using default")
-		config.backend_url = "http://localhost:8788/api"
+		push_warning("Invalid backend_url format (must be HTTPS): '" + config.backend_url + "', using default")
+		config.backend_url = "https://localhost:8788/api"
 
 	# Validate log level
 	if not config.log_level.to_upper() in VALID_LOG_LEVELS:
 		push_warning("Invalid log_level: '" + config.log_level + "', defaulting to INFO")
 		config.log_level = "INFO"
-
-	# Warn about password storage
-	if config.has("password") and config.password != "":
-		push_warning("SECURITY WARNING: Storing passwords in config is not recommended for production!")
 
 	# Validate boolean values
 	if typeof(config.auto_login) != TYPE_BOOL:
@@ -157,10 +153,10 @@ func _validate_config():
 		config.enable_audio = bool(config.enable_audio)
 
 func _is_valid_url(url: String) -> bool:
-	"""Validate URL format using regex"""
+	"""Validate URL format using regex - HTTPS only for security"""
 	var regex = RegEx.new()
-	# Match http(s)://host(:port)?(/path)?
-	regex.compile("^https?://[a-zA-Z0-9.-]+(:[0-9]+)?(/[^\\s]*)?$")
+	# Match https://host(:port)?(/path)? - HTTP not allowed
+	regex.compile("^https://[a-zA-Z0-9.-]+(:[0-9]+)?(/[^\\s]*)?$")
 	var result = regex.search(url)
 	return result != null
 
@@ -195,8 +191,7 @@ func get_backend_url() -> String:
 func get_user_id() -> String:
 	return config.user_id
 
-func get_password() -> String:
-	return config.password
+# get_password() removed - passwords no longer stored in config
 
 func should_auto_login() -> bool:
 	return config.auto_login

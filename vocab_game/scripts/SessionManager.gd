@@ -34,7 +34,7 @@ func start_new_session(grade: String = "grade3"):
 
 	# First, get available courses if we don't have a course_id yet
 	if course_id == "":
-		Logger.info("Fetching available courses...", "SessionManager")
+		print("SessionManager: Fetching available courses...")
 		var courses_response = await PlaycademySdk.backend.request("GET", "/content/course", {})
 
 		if courses_response.has("error"):
@@ -44,7 +44,7 @@ func start_new_session(grade: String = "grade3"):
 
 		if courses_response.has("courses") and courses_response.courses.size() > 0:
 			course_id = courses_response.courses[0].courseId
-			Logger.info("Using course ID: " + course_id, "SessionManager")
+			print("SessionManager: Using course ID: " + course_id)
 		else:
 			loading_ended.emit()
 			api_error.emit("No courses available. Please set up courses in the backend.")
@@ -78,7 +78,7 @@ func start_new_session(grade: String = "grade3"):
 	current_activity_index = 0
 	session_active = true
 
-	Logger.info("Session started! ID: " + current_session_id + ", Items: " + str(response.itemCount), "SessionManager")
+	print("SessionManager: Session started! ID: " + current_session_id + ", Items: " + str(response.itemCount))
 	session_started.emit(response)
 
 	# Load first activity
@@ -107,7 +107,7 @@ func _load_next_activity():
 
 	# Check if session is complete (no more items)
 	if response.has("completed") and response.completed:
-		Logger.info("Session complete!", "SessionManager")
+		print("SessionManager: Session complete!")
 		_end_session()
 		return
 
@@ -125,7 +125,7 @@ func _load_next_activity():
 	current_activity_start_time = Time.get_ticks_msec()
 
 	# Emit activity changed with the new activity data
-	Logger.debug("Loaded activity: " + response.activityType, "SessionManager")
+	print("SessionManager: Loaded activity: " + response.activityType)
 	activity_changed.emit(response, current_activity_index, -1)  # Total count not available
 	current_activity_index += 1
 

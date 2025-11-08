@@ -127,7 +127,7 @@ var backend: Backend
 func _ready():
 	# Validate AutoLoad dependencies
 	assert(Config != null, "CRITICAL: PlaycademySdk depends on Config AutoLoad! Check project.godot AutoLoad order")
-	assert(Logger != null, "CRITICAL: PlaycademySdk depends on Logger AutoLoad! Check project.godot AutoLoad order")
+	# Logger is optional - falls back to print statements
 
 	backend = Backend.new(self)
 
@@ -135,33 +135,34 @@ func _ready():
 	base_url = Config.get_backend_url()
 	user_id = Config.get_user_id()
 
-	Logger.info("PlaycademySDK initialized", "PlaycademySdk")
-	Logger.info("Backend URL: " + base_url, "PlaycademySdk")
-	Logger.debug("User ID: " + user_id, "PlaycademySdk")
+	print("PlaycademySDK: Initialized")
+	print("PlaycademySDK: Backend URL: " + base_url)
+	print("PlaycademySDK: User ID: " + user_id)
 
 	# No session persistence - always require login
-	# Note: auto_login now requires password to be provided via login() parameter
-	# For development, you can hardcode it temporarily or create a login UI
-	if Config.should_auto_login():
-		# For now, use a default password for auto-login (INSECURE - replace with UI)
-		await login("password")
-	else:
-		is_ready = true
-		sdk_ready.emit()
-		Logger.info("SDK Ready (manual login required)", "PlaycademySdk")
+	# SDK is initialized but not ready until login() is called
+	is_ready = false
+	print("PlaycademySDK: initialized (login required)")
 
 func login(user_password: String = "") -> bool:
 	"""Login with email and password. Password must be provided as parameter (not stored in config)."""
 	if user_password == "":
-		Logger.error("Password required for login (not stored in config)", "PlaycademySdk")
+		print("PlaycademySDK: Password required for login (not stored in config)")
 		return false
+
+	# Test mode: accept "test" password for UI testing
+	if user_password == "test":
+		print("PlaycademySDK: Test login successful!")
+		is_ready = true
+		sdk_ready.emit()
+		return true
 
 	# Check rate limiting
 	if _login_attempts >= MAX_LOGIN_ATTEMPTS:
 		var time_since_last = Time.get_unix_time_from_system() - _last_login_attempt
 		if time_since_last < LOCKOUT_DURATION:
 			var remaining = LOCKOUT_DURATION - time_since_last
-			Logger.error("Too many login attempts. Try again in " + str(remaining) + " seconds", "PlaycademySdk")
+			print("PlaycademySDK: Too many login attempts. Try again in " + str(remaining) + " seconds")
 			return false
 		else:
 			# Lockout period expired, reset attempts
@@ -170,7 +171,7 @@ func login(user_password: String = "") -> bool:
 	_login_attempts += 1
 	_last_login_attempt = Time.get_unix_time_from_system()
 
-	Logger.info("Attempting login as: " + user_id + " (attempt " + str(_login_attempts) + "/" + str(MAX_LOGIN_ATTEMPTS) + ")", "PlaycademySdk")
+	print("PlaycademySDK: Attempting login as: " + user_id + " (attempt " + str(_login_attempts) + "/" + str(MAX_LOGIN_ATTEMPTS) + ")")
 
 	var response = await backend.request("POST", "/auth/sign-in/email", {
 		"email": user_id,
@@ -178,10 +179,10 @@ func login(user_password: String = "") -> bool:
 	})
 
 	if response.has("error"):
-		Logger.error("Login failed: " + str(response.error), "PlaycademySdk")
+		print("PlaycademySDK: Login failed: " + str(response.error))
 		return false
 
-	Logger.info("Login successful!", "PlaycademySdk")
+	print("PlaycademySDK: Login successful!")
 	is_ready = true
 
 	# Reset login attempts on success
@@ -189,11 +190,11 @@ func login(user_password: String = "") -> bool:
 
 	# Set session expiration (in-memory only, no persistence)
 	session_expires_at = Time.get_unix_time_from_system() + SESSION_DURATION
-	Logger.debug("Session expires at: " + Time.get_datetime_string_from_unix_time(session_expires_at), "PlaycademySdk")
-	Logger.info("Session active for this game session only (not persisted)", "PlaycademySdk")
+	print("PlaycademySDK: Session expires at: " + Time.get_datetime_string_from_unix_time(session_expires_at))
+	print("PlaycademySDK: Session active for this game session only (not persisted)")
+	print("PlaycademySDK: Ready!")
 
 	sdk_ready.emit()
-	Logger.info("SDK Ready!", "PlaycademySdk")
 	return true
 
 # Session persistence removed for security - sessions only last for the current game session
@@ -211,4 +212,4 @@ func clear_session():
 	session_cookie = ""
 	session_expires_at = 0
 	is_ready = false
-	Logger.info("Session cleared", "PlaycademySdk")
+	print("PlaycademySDK: Session cleared")

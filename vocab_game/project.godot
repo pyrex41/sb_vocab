@@ -19,6 +19,7 @@ config/icon="res://icon.svg"
 
 Config="*res://scripts/Config.gd"
 Logger="*res://scripts/Logger.gd"
+AudioManager="*res://scripts/AudioManager.gd"
 PlaycademySdk="*res://scripts/PlaycademySdk.gd"
 SessionManager="*res://scripts/SessionManager.gd"
 

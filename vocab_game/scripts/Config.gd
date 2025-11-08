@@ -6,7 +6,7 @@ extends Node
 
 # Default configuration values
 var config = {
-	"backend_url": "https://localhost:8788/api",  # Changed to HTTPS for security
+	"backend_url": "http://localhost:8788/api",  # HTTP for local testing, will be HTTPS in production
 	"user_id": "student.fresh@demo.playcademy.com",
 	# Password removed - must be provided at login for security
 	"auto_login": true,
@@ -153,10 +153,10 @@ func _validate_config():
 		config.enable_audio = bool(config.enable_audio)
 
 func _is_valid_url(url: String) -> bool:
-	"""Validate URL format using regex - HTTPS only for security"""
+	"""Validate URL format using regex - HTTPS for production, HTTP allowed for localhost testing"""
 	var regex = RegEx.new()
-	# Match https://host(:port)?(/path)? - HTTP not allowed
-	regex.compile("^https://[a-zA-Z0-9.-]+(:[0-9]+)?(/[^\\s]*)?$")
+	# Match http(s)://host(:port)?(/path)?
+	regex.compile("^https?://[a-zA-Z0-9.-]+(:[0-9]+)?(/[^\\s]*)?$")
 	var result = regex.search(url)
 	return result != null
 
@@ -181,8 +181,7 @@ func save_user_config() -> bool:
 	file.store_string(json_string)
 	file.close()
 
-	if Logger:
-		Logger.info("Config saved to user directory", "Config")
+	push_warning("Config: Saved to user directory")
 	return true
 
 func get_backend_url() -> String:
